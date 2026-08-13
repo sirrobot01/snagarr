@@ -56,6 +56,7 @@ func (s *Server) Handler() http.Handler {
 			r.Post("/items/{id}/resolve", s.resolveItem)
 			r.Post("/items/{id}/archive", s.archiveItem)
 			r.Delete("/items/{id}", s.deleteItem)
+			r.Post("/items/{id}/send", s.sendItem)
 
 			r.Post("/plex/pin", s.createPlexPin)
 			r.Get("/plex/pin/{id}", s.checkPlexPin)
@@ -74,7 +75,6 @@ func (s *Server) Handler() http.Handler {
 			r.Group(func(r chi.Router) {
 				r.Use(requireAdmin)
 
-				r.Post("/items/{id}/send", s.sendItem)
 				r.Get("/users", s.listUsers)
 				r.Post("/users", s.createUser)
 				r.Patch("/users/{id}", s.updateUser)

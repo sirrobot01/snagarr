@@ -6,12 +6,18 @@ import type {
   Item,
   ItemsResponse,
   MediaType,
+  NewService,
+  PlexPin,
+  PlexPinCheck,
+  PlexServer,
   SearchResponse,
   SendTarget,
-  ServiceKey,
+  Service,
   ServiceOptions,
+  ServicePatch,
   Settings,
   SettingsPatch,
+  ShortcutLink,
   StatusResponse,
   TestResult,
   Token,
@@ -125,16 +131,51 @@ export const api = {
 
   revokeToken: (id: number) => request<void>(`/tokens/${id}`, { method: 'DELETE' }),
 
+  /** Admin only — the global settings are now just TMDB and General. */
   settings: () => request<Settings>('/settings'),
 
   saveSettings: (patch: SettingsPatch) =>
     request<Settings>('/settings', { method: 'PUT', ...json(patch) }),
 
-  testService: (service: ServiceKey) =>
-    request<TestResult>('/settings/test', { method: 'POST', ...json({ service }) }),
+  /** The only global service left with a test of its own. */
+  testTmdb: () =>
+    request<TestResult>('/settings/test', { method: 'POST', ...json({ service: 'tmdb' }) }),
 
-  serviceOptions: (service: ServiceKey) =>
-    request<ServiceOptions>(`/settings/options${query({ service })}`),
+  /* ── Services ───────────────────────────────────────────────────────────── */
+
+  services: () => request<{ services: Service[] }>('/services'),
+
+  /** Admin only — another member's stack, for the household view. */
+  userServices: (userId: number) => request<{ services: Service[] }>(`/users/${userId}/services`),
+
+  createService: (body: NewService) =>
+    request<Service>('/services', { method: 'POST', ...json(body) }),
+
+  updateService: (id: number, patch: ServicePatch) =>
+    request<Service>(`/services/${id}`, { method: 'PATCH', ...json(patch) }),
+
+  deleteService: (id: number) => request<void>(`/services/${id}`, { method: 'DELETE' }),
+
+  testService: (id: number) => request<TestResult>(`/services/${id}/test`, { method: 'POST' }),
+
+  serviceOptions: (id: number) => request<ServiceOptions>(`/services/${id}/options`),
+
+  /* ── Plex sign-in ───────────────────────────────────────────────────────── */
+
+  plexPin: () => request<PlexPin>('/plex/pin', { method: 'POST' }),
+
+  /** Resolves with `token` once linked, with `status: "pending"` while waiting.
+      Throws ApiError(410) once the pin has expired. */
+  plexPinCheck: (id: number) => request<PlexPinCheck>(`/plex/pin/${id}`),
+
+  plexServers: (token: string) =>
+    request<{ servers: PlexServer[] }>(`/plex/servers${query({ token })}`),
+
+  /* ── Apple Shortcut ─────────────────────────────────────────────────────── */
+
+  /** Admin only. Returns a short-lived signed download link. */
+  shortcut: (userId: number) =>
+    request<ShortcutLink>(`/users/${userId}/shortcut`, { method: 'POST' }),
 
   sync: () => request<void>('/admin/sync', { method: 'POST' }),
 };

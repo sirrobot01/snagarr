@@ -496,3 +496,33 @@ func TestWebhookSecretIsReadable(t *testing.T) {
 		t.Errorf("webhook with the reported secret = %d, want 204", resp.StatusCode)
 	}
 }
+
+// Per-user services only mean something if a member can spend their own. They
+// must not reach an admin's, which is what the admin-only route used to guard.
+func TestMemberSendsOnlyToOwnServices(t *testing.T) {
+	h := newHarness(t)
+	ctx := context.Background()
+
+	adminRadarr := &store.Service{
+		UserID: h.admin.ID, Kind: store.KindRadarr, Name: "Default", Enabled: true,
+		Config: []byte(`{"url":"http://radarr.lan:7878","api_key":"k"}`),
+	}
+	if err := h.store.CreateService(ctx, adminRadarr); err != nil {
+		t.Fatalf("seed service: %v", err)
+	}
+
+	it := &store.Item{
+		Title: "Anora", RawInput: "anora", Status: store.StatusNew, Source: store.SourceWeb,
+		TMDBID: 1064213, MediaType: media.Movie, CapturedBy: h.member.ID,
+	}
+	if err := h.store.CreateItem(ctx, it); err != nil {
+		t.Fatalf("seed item: %v", err)
+	}
+
+	// The member owns no Radarr, so this must fail rather than borrow the admin's.
+	resp := h.do(t, http.MethodPost, "/api/v1/items/"+strconv.FormatInt(it.ID, 10)+"/send",
+		h.memberToken, map[string]any{"target": "radarr"})
+	if resp.StatusCode != http.StatusServiceUnavailable {
+		t.Errorf("member send with no own Radarr = %d, want 503", resp.StatusCode)
+	}
+}

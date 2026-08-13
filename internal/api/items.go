@@ -264,7 +264,7 @@ func (s *Server) sendItem(w http.ResponseWriter, r *http.Request) {
 		s.writeStoreError(w, err, "services")
 		return
 	}
-	owners := s.serviceOwners(ctx, userFrom(r).ID, it.CapturedBy)
+	owners := s.serviceOwners(ctx, userFrom(r), it.CapturedBy)
 	var status store.Status
 
 	switch req.Target {

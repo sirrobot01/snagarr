@@ -9,10 +9,11 @@ import { pushToast } from './toast';
 import type {
   Item,
   ItemsResponse,
+  NewService,
   SearchResponse,
   SearchResult,
   SendTarget,
-  ServiceKey,
+  ServicePatch,
   SettingsPatch,
   UserRef,
 } from './types';
@@ -26,7 +27,9 @@ export const keys = {
   settings: ['settings'] as const,
   users: ['users'] as const,
   tokens: (userId: number) => ['tokens', userId] as const,
-  options: (service: ServiceKey) => ['options', service] as const,
+  services: ['services'] as const,
+  userServices: (userId: number) => ['services', 'user', userId] as const,
+  options: (id: number) => ['options', id] as const,
 };
 
 const TEMP_ID = -1;
@@ -298,4 +301,48 @@ export function useUsers(enabled: boolean) {
 
 export function isAdmin(me: UserRef | undefined) {
   return me?.role === 'admin';
+}
+
+/* ── Services ─────────────────────────────────────────────────────────────── */
+
+/** Every member owns their own services, so this needs no role check. */
+export function useServices() {
+  return useQuery({ queryKey: keys.services, queryFn: api.services });
+}
+
+/** Admin only: another member's stack, read-only. */
+export function useUserServices(userId: number | null) {
+  return useQuery({
+    queryKey: keys.userServices(userId ?? 0),
+    queryFn: () => api.userServices(userId as number),
+    enabled: userId !== null,
+  });
+}
+
+/* Creating, editing or deleting a service changes what the household can
+   reach, so the status badges have to be refetched with the list. */
+function useServiceMutation<V>(action: string, run: (value: V) => Promise<unknown>) {
+  const client = useQueryClient();
+  return useMutation({
+    mutationFn: run,
+    onError: (error) => failed(action, error),
+    onSettled: () => {
+      void client.invalidateQueries({ queryKey: keys.services });
+      void client.invalidateQueries({ queryKey: keys.status });
+    },
+  });
+}
+
+export function useCreateService() {
+  return useServiceMutation<NewService>('add service', api.createService);
+}
+
+export function useSaveService() {
+  return useServiceMutation<{ id: number; patch: ServicePatch }>('save', ({ id, patch }) =>
+    api.updateService(id, patch),
+  );
+}
+
+export function useDeleteService() {
+  return useServiceMutation<number>('delete service', api.deleteService);
 }

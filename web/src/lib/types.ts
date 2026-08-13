@@ -128,58 +128,16 @@ export interface CreatedToken {
   created_at: string;
 }
 
-export type ServiceKey =
-  | 'tmdb'
-  | 'library'
-  | 'radarr'
-  | 'sonarr'
-  | 'overseerr'
-  | 'ntfy'
-  | 'telegram';
+/* ── Settings ───────────────────────────────────────────────────────────────
+   Only TMDB and General are global now. Every other integration is a service
+   record owned by a household member. */
 
 export interface TmdbSettings {
   api_key: string;
   configured: boolean;
   locked?: boolean;
 }
-export interface LibrarySettings {
-  provider: 'plex' | 'emby' | 'jellyfin' | '';
-  url: string;
-  token: string;
-  section_ids: string[];
-  collection_name: string;
-  configured: boolean;
-  locked?: boolean;
-}
-export interface ArrSettings {
-  url: string;
-  api_key: string;
-  quality_profile_id: number | null;
-  root_folder: string;
-  season_folder?: boolean;
-  search_on_add: boolean;
-  configured: boolean;
-  locked?: boolean;
-}
-export interface OverseerrSettings {
-  url: string;
-  api_key: string;
-  configured: boolean;
-  locked?: boolean;
-}
-export interface NtfySettings {
-  url: string;
-  topic: string;
-  token: string;
-  priority: number;
-  configured: boolean;
-  locked?: boolean;
-}
-export interface TelegramSettings {
-  bot_token: string;
-  configured: boolean;
-  locked?: boolean;
-}
+
 export interface GeneralSettings {
   /** Go duration string. The reconcile loop re-reads it, so a change needs no restart. */
   reconcile_interval: string;
@@ -192,18 +150,68 @@ export interface GeneralSettings {
 
 export interface Settings {
   tmdb: TmdbSettings;
-  library: LibrarySettings;
-  radarr: ArrSettings;
-  sonarr: ArrSettings;
-  overseerr: OverseerrSettings;
-  ntfy: NtfySettings;
-  telegram: TelegramSettings;
   general: GeneralSettings;
 }
 
 export type SettingsPatch = {
   [K in keyof Settings]?: Partial<Settings[K]>;
 };
+
+/* ── Services ─────────────────────────────────────────────────────────────── */
+
+export type ServiceKind =
+  | 'plex'
+  | 'emby'
+  | 'jellyfin'
+  | 'radarr'
+  | 'sonarr'
+  | 'overseerr'
+  | 'ntfy';
+
+/** The union of every kind's config document. Which keys a kind uses is fixed
+    by `internal/config/services.go`; the server fills in the rest as defaults. */
+export interface ServiceConfig {
+  url?: string;
+  /** Plex/Emby/Jellyfin credential. Masked on the way out. */
+  token?: string;
+  /** Radarr/Sonarr/Overseerr credential. Masked on the way out. */
+  api_key?: string;
+  /** Go marshals an empty []string as null, so this arrives unset or null. */
+  section_ids?: string[] | null;
+  collection_name?: string;
+  quality_profile_id?: number;
+  root_folder?: string;
+  season_folder?: boolean;
+  search_on_add?: boolean;
+  topic?: string;
+  priority?: number;
+}
+
+export interface Service {
+  id: number;
+  user_id: number;
+  kind: ServiceKind;
+  name: string;
+  config: ServiceConfig;
+  enabled: boolean;
+  /** An environment variable pins this record; every restart rewrites it. */
+  locked: boolean;
+  created_at: string;
+  updated_at: string;
+}
+
+export interface NewService {
+  kind: ServiceKind;
+  name: string;
+  config?: ServiceConfig;
+  enabled?: boolean;
+}
+
+export interface ServicePatch {
+  name?: string;
+  config?: ServiceConfig;
+  enabled?: boolean;
+}
 
 export interface TestResult {
   ok: boolean;
@@ -214,4 +222,39 @@ export interface ServiceOptions {
   quality_profiles?: { id: number; name: string }[];
   root_folders?: { path: string; free_space: number }[];
   sections?: { id: string; title: string; type: string }[];
+}
+
+/* ── Plex sign-in ─────────────────────────────────────────────────────────── */
+
+export interface PlexPin {
+  id: number;
+  code: string;
+  auth_url: string;
+  expires_at: string;
+}
+
+/** 200 carries `token`; 202 carries `status: "pending"`; 410 is an error. */
+export interface PlexPinCheck {
+  token?: string;
+  status?: string;
+}
+
+export interface PlexConnection {
+  uri: string;
+  local: boolean;
+  relay: boolean;
+}
+
+export interface PlexServer {
+  name: string;
+  client_identifier: string;
+  /** Ordered fastest-first, so the head is the one worth storing. */
+  connections: PlexConnection[];
+}
+
+/* ── Apple Shortcut ───────────────────────────────────────────────────────── */
+
+export interface ShortcutLink {
+  url: string;
+  expires_at: string;
 }

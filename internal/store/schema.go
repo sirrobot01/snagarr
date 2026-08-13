@@ -309,6 +309,9 @@ func (s *Store) splitSettingsIntoServices(tx *sql.Tx) error {
 			return err
 		}
 	}
+	// The Telegram bot was never built, and its section held a credential.
+	delete(document, "telegram")
+
 	if config, ok := document["library"]; ok {
 		delete(document, "library")
 		kind, stripped := splitLibrarySection(config)

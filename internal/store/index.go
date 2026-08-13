@@ -323,7 +323,8 @@ func (s *Store) SearchLibrary(ctx context.Context, query string, limit int) ([]L
 			l.media_type, l.title, l.year
 		 FROM library_fts
 		 JOIN library_index l ON l.id = library_fts.rowid
-		 WHERE library_fts MATCH ? AND l.tmdb_id IS NOT NULL
+		 JOIN services s ON s.id = l.service_id
+		 WHERE library_fts MATCH ? AND l.tmdb_id IS NOT NULL AND s.enabled = 1
 		 ORDER BY bm25(library_fts) LIMIT ?`, match, limit)
 	if err != nil {
 		return nil, fmt.Errorf("search library: %w", err)
