@@ -66,7 +66,13 @@ type Settings struct {
 func (s TMDBSettings) Configured() bool { return s.APIKey != "" }
 
 func defaults() Settings {
-	return Settings{General: GeneralSettings{ReconcileInterval: Duration(15 * time.Minute)}}
+	return Settings{General: GeneralSettings{
+		ReconcileInterval: Duration(15 * time.Minute),
+		// Snagarr's published Shortcut. Apple signs shortcuts shared as an
+		// iCloud link, so it imports with no untrusted-shortcut prompt, and its
+		// import questions collect the address and token from each person.
+		ShortcutURL: "https://www.icloud.com/shortcuts/c4b4dabe0b55481c9fe35fac0a4a266b",
+	}}
 }
 
 // secretFields maps the dotted path of every secret to a pointer into s, so
