@@ -85,6 +85,12 @@ func serve(args []string) error {
 	if err := bootstrapAdmin(ctx, db, settings, cfg, log); err != nil {
 		return err
 	}
+	// Integrations belong to a member, so the environment configures the admin
+	// created above. This runs after the bootstrap or there is nobody to own
+	// them on a first run.
+	if err := settings.SeedServices(ctx, db); err != nil {
+		return err
+	}
 
 	engine := reconcile.New(db, settings, log)
 	server := api.New(db, settings, resolver.New(db, log), engine, web.Handler(), log)

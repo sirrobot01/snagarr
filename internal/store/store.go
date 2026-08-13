@@ -69,6 +69,12 @@ func (s *Store) migrate() error {
 			_ = tx.Rollback()
 			return fmt.Errorf("migration %d: %w", i+1, err)
 		}
+		if step := migrationSteps[i+1]; step != nil {
+			if err := step(s, tx); err != nil {
+				_ = tx.Rollback()
+				return fmt.Errorf("migration %d: %w", i+1, err)
+			}
+		}
 		// PRAGMA does not accept bound parameters.
 		if _, err := tx.Exec(fmt.Sprintf("PRAGMA user_version = %d", i+1)); err != nil {
 			_ = tx.Rollback()

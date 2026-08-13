@@ -35,6 +35,14 @@ export function LibraryCard({ settings, draft }: CardProps) {
         current={current}
         onChange={(values) => draft.set('library', values)}
       />
+      <TextField
+        id="library-collection"
+        label="Collection name"
+        value={current.collection_name}
+        locked={current.locked}
+        placeholder="Snagged"
+        onChange={(value) => draft.set('library', { collection_name: value })}
+      />
     </ServiceCard>
   );
 }

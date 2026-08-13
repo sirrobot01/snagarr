@@ -73,25 +73,3 @@ export function NtfyCard({ settings, draft }: CardProps) {
     </ServiceCard>
   );
 }
-
-export function TelegramCard({ settings, draft }: CardProps) {
-  const current = { ...settings.telegram, ...draft.patch.telegram };
-
-  return (
-    <ServiceCard
-      service="telegram"
-      name="Telegram"
-      configured={current.configured}
-      draft={draft}
-      testable={false}
-    >
-      <TextField
-        id="telegram-token"
-        label="Bot token"
-        value={current.bot_token}
-        locked={current.locked}
-        onChange={(value) => draft.set('telegram', { bot_token: value })}
-      />
-    </ServiceCard>
-  );
-}

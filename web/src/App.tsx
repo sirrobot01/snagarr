@@ -1,6 +1,8 @@
 import { Suspense, lazy, useEffect, useSyncExternalStore } from 'react';
 import { Route, Switch, useLocation } from 'wouter';
 
+import { ErrorBoundary } from './components/ErrorBoundary';
+
 import { Footer } from './components/Footer';
 import { Nav } from './components/Nav';
 import { OfflineBanner } from './components/OfflineBanner';
@@ -69,6 +71,7 @@ function Shell() {
       <Nav me={me.data} admin={admin} />
 
       <main className="sg-col flex-1">
+        <ErrorBoundary>
         <Suspense fallback={<Loading />}>
           <Switch>
             <Route path="/" component={Snag} />
@@ -83,6 +86,7 @@ function Shell() {
             </Route>
           </Switch>
         </Suspense>
+        </ErrorBoundary>
       </main>
 
       <Footer context={footer} />

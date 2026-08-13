@@ -67,8 +67,8 @@ func (s *Server) capture(w http.ResponseWriter, r *http.Request) {
 	// Resolution outlives the request: the capture is already safe on disk.
 	// Without a TMDB key there is nothing to resolve against, and the item is
 	// already parked in needs_review, so it waits for the key instead.
-	if tmdbClient := s.clients().TMDB; tmdbClient != nil {
-		go s.resolveInBackground(context.WithoutCancel(r.Context()), tmdbClient, it.ID)
+	if catalogue := s.tmdb(); catalogue != nil {
+		go s.resolveInBackground(context.WithoutCancel(r.Context()), catalogue, it.ID)
 	}
 
 	// Read it back so the response carries the capturer's name, which only the
@@ -96,12 +96,12 @@ func (s *Server) captureKnownTitle(w http.ResponseWriter, r *http.Request, req c
 		return
 	}
 
-	set := s.clients()
-	if set.TMDB == nil {
+	catalogue := s.tmdb()
+	if catalogue == nil {
 		writeError(w, http.StatusServiceUnavailable, codeNotConfigured, "TMDB is not configured")
 		return
 	}
-	details, err := set.TMDB.Details(ctx, req.MediaType, int(req.TMDBID))
+	details, err := catalogue.Details(ctx, req.MediaType, int(req.TMDBID))
 	if err != nil {
 		writeError(w, http.StatusBadGateway, codeUpstreamError, "TMDB lookup failed: %v", err)
 		return
@@ -211,12 +211,12 @@ func (s *Server) resolveItem(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
-	set := s.clients()
-	if set.TMDB == nil {
+	catalogue := s.tmdb()
+	if catalogue == nil {
 		writeError(w, http.StatusServiceUnavailable, codeNotConfigured, "TMDB is not configured")
 		return
 	}
-	details, err := set.TMDB.Details(r.Context(), req.MediaType, int(req.TMDBID))
+	details, err := catalogue.Details(r.Context(), req.MediaType, int(req.TMDBID))
 	if err != nil {
 		writeError(w, http.StatusBadGateway, codeUpstreamError, "TMDB lookup failed: %v", err)
 		return
@@ -240,6 +240,8 @@ func (s *Server) resolveItem(w http.ResponseWriter, r *http.Request) {
 	s.respondWithItem(w, r, it.ID)
 }
 
+// sendItem pushes a title to a service. The action is personal: it uses the
+// caller's own service, then the capturer's, then an admin's.
 func (s *Server) sendItem(w http.ResponseWriter, r *http.Request) {
 	var req struct {
 		Target string `json:"target"`
@@ -256,52 +258,59 @@ func (s *Server) sendItem(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
-	settings := s.settings.Get()
-	set := s.clients()
-	var err error
+	ctx := r.Context()
+	house, err := s.household(ctx)
+	if err != nil {
+		s.writeStoreError(w, err, "services")
+		return
+	}
+	owners := s.serviceOwners(ctx, userFrom(r).ID, it.CapturedBy)
 	var status store.Status
 
 	switch req.Target {
 	case "radarr":
-		if set.Radarr == nil {
-			writeError(w, http.StatusServiceUnavailable, codeNotConfigured, "Radarr is not configured")
+		target := house.RadarrFor(owners...)
+		if target == nil {
+			writeError(w, http.StatusServiceUnavailable, codeNotConfigured, "nobody has a Radarr configured")
 			return
 		}
-		_, err = set.Radarr.Add(r.Context(), int(it.TMDBID), arr.AddOptions{
-			QualityProfileID: settings.Radarr.QualityProfileID,
-			RootFolder:       settings.Radarr.RootFolder,
+		_, err = target.Client.Add(ctx, int(it.TMDBID), arr.AddOptions{
+			QualityProfileID: target.Config.QualityProfileID,
+			RootFolder:       target.Config.RootFolder,
 			Monitor:          true,
-			SearchOnAdd:      settings.Radarr.SearchOnAdd,
+			SearchOnAdd:      target.Config.SearchOnAdd,
 		})
 		status = store.StatusMonitored
 
 	case "sonarr":
-		if set.Sonarr == nil {
-			writeError(w, http.StatusServiceUnavailable, codeNotConfigured, "Sonarr is not configured")
+		target := house.SonarrFor(owners...)
+		if target == nil {
+			writeError(w, http.StatusServiceUnavailable, codeNotConfigured, "nobody has a Sonarr configured")
 			return
 		}
 		ids := arr.ExternalIDs{TMDBID: int(it.TMDBID), Title: it.Title, Year: it.Year}
 		// Sonarr keys on TVDB, so the TMDB ID has to be translated first.
-		if set.TMDB != nil {
-			if external, idErr := set.TMDB.ExternalIDs(r.Context(), it.MediaType, int(it.TMDBID)); idErr == nil {
+		if catalogue := s.tmdb(); catalogue != nil {
+			if external, idErr := catalogue.ExternalIDs(ctx, it.MediaType, int(it.TMDBID)); idErr == nil {
 				ids.TVDBID, ids.IMDBID = external.TVDBID, external.IMDBID
 			}
 		}
-		_, err = set.Sonarr.Add(r.Context(), ids, arr.AddOptions{
-			QualityProfileID: settings.Sonarr.QualityProfileID,
-			RootFolder:       settings.Sonarr.RootFolder,
+		_, err = target.Client.Add(ctx, ids, arr.AddOptions{
+			QualityProfileID: target.Config.QualityProfileID,
+			RootFolder:       target.Config.RootFolder,
 			Monitor:          true,
-			SearchOnAdd:      settings.Sonarr.SearchOnAdd,
-			SeasonFolder:     settings.Sonarr.SeasonFolder,
+			SearchOnAdd:      target.Config.SearchOnAdd,
+			SeasonFolder:     target.Config.SeasonFolder,
 		})
 		status = store.StatusMonitored
 
 	case "overseerr":
-		if set.Overseerr == nil {
-			writeError(w, http.StatusServiceUnavailable, codeNotConfigured, "Overseerr is not configured")
+		target := house.OverseerrFor(owners...)
+		if target == nil {
+			writeError(w, http.StatusServiceUnavailable, codeNotConfigured, "nobody has an Overseerr configured")
 			return
 		}
-		_, err = set.Overseerr.Create(r.Context(), int(it.TMDBID), it.MediaType)
+		_, err = target.Client.Create(ctx, int(it.TMDBID), it.MediaType)
 		status = store.StatusRequested
 
 	default:
@@ -406,6 +415,8 @@ func (s *Server) cacheEntity(ctx context.Context, d *tmdb.Details) {
 	}
 }
 
-func (s *Server) clients() clients.Set {
-	return clients.Build(s.settings.Get(), s.store.HTTPCache())
+// tmdb builds the catalogue client. TMDB stays global — one key per install —
+// and is nil when no key is set.
+func (s *Server) tmdb() *tmdb.Client {
+	return clients.TMDB(s.settings.Get(), s.store.HTTPCache())
 }

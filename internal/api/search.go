@@ -59,8 +59,8 @@ func (s *Server) search(w http.ResponseWriter, r *http.Request) {
 
 	// TMDB being unreachable degrades search rather than breaking it: the
 	// library tier has already answered.
-	if set := s.clients(); set.TMDB != nil {
-		found, err := set.TMDB.SearchMulti(ctx, query)
+	if catalogue := s.tmdb(); catalogue != nil {
+		found, err := catalogue.SearchMulti(ctx, query)
 		if err != nil {
 			s.log.Warn("tmdb search failed", "query", query, "error", err)
 		}

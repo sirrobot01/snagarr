@@ -34,3 +34,8 @@ node_modules/
 # Vite output embedded by internal/web
 internal/web/dist/*
 !internal/web/dist/.gitkeep
+
+# Documentation site
+/website/node_modules/
+/website/dist/
+/website/.astro/

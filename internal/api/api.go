@@ -40,6 +40,9 @@ func (s *Server) Handler() http.Handler {
 		// Webhook senders authenticate with a shared secret in the query
 		// string, because Radarr, Tautulli and Emby cannot all set headers.
 		r.Post("/webhooks/{service}", s.webhook)
+		// The generated link is the credential and is consumed on first use,
+		// so this route carries no bearer token — an iPhone cannot send one.
+		r.Get("/shortcut/{handle}", s.serveShortcut)
 
 		r.Group(func(r chi.Router) {
 			r.Use(s.authenticate)
@@ -54,6 +57,20 @@ func (s *Server) Handler() http.Handler {
 			r.Post("/items/{id}/archive", s.archiveItem)
 			r.Delete("/items/{id}", s.deleteItem)
 
+			r.Post("/plex/pin", s.createPlexPin)
+			r.Get("/plex/pin/{id}", s.checkPlexPin)
+			r.Get("/plex/servers", s.listPlexServers)
+
+			// Every member owns their own integrations. The handlers below
+			// enforce ownership themselves: a member reaches their own
+			// services, an admin reaches everybody's.
+			r.Get("/services", s.listServices)
+			r.Post("/services", s.createService)
+			r.Patch("/services/{id}", s.updateService)
+			r.Delete("/services/{id}", s.deleteService)
+			r.Post("/services/{id}/test", s.testService)
+			r.Get("/services/{id}/options", s.serviceOptions)
+
 			r.Group(func(r chi.Router) {
 				r.Use(requireAdmin)
 
@@ -64,11 +81,12 @@ func (s *Server) Handler() http.Handler {
 				r.Delete("/users/{id}", s.deleteUser)
 				r.Get("/users/{id}/tokens", s.listTokens)
 				r.Post("/users/{id}/tokens", s.createToken)
+				r.Get("/users/{id}/services", s.listUserServices)
+				r.Post("/users/{id}/shortcut", s.createShortcutLink)
 				r.Delete("/tokens/{id}", s.revokeToken)
 				r.Get("/settings", s.getSettings)
 				r.Put("/settings", s.putSettings)
-				r.Post("/settings/test", s.testService)
-				r.Get("/settings/options", s.serviceOptions)
+				r.Post("/settings/test", s.testSettings)
 				r.Post("/admin/sync", s.forceSync)
 			})
 		})
@@ -93,18 +111,24 @@ func (s *Server) status(w http.ResponseWriter, r *http.Request) {
 		s.writeStoreError(w, err, "counts")
 		return
 	}
-	settings := s.settings.Get()
+	house, err := s.household(r.Context())
+	if err != nil {
+		s.writeStoreError(w, err, "services")
+		return
+	}
 	writeJSON(w, http.StatusOK, map[string]any{
 		"version": buildVersion,
 		"counts":  counts,
 		"sync":    s.engine.Status(),
+		// Household-wide: one member's Radarr answers for everybody, because
+		// the list they all read is a shared one.
 		"services": map[string]bool{
-			"tmdb":      settings.TMDB.Configured(),
-			"library":   settings.Library.Configured(),
-			"radarr":    settings.Radarr.Configured(),
-			"sonarr":    settings.Sonarr.Configured(),
-			"overseerr": settings.Overseerr.Configured(),
-			"ntfy":      settings.Ntfy.Configured(),
+			"tmdb":      s.settings.Get().TMDB.Configured(),
+			"library":   len(house.Libraries) > 0,
+			"radarr":    len(house.Radarrs) > 0,
+			"sonarr":    len(house.Sonarrs) > 0,
+			"overseerr": len(house.Overseerrs) > 0,
+			"ntfy":      len(house.Ntfys) > 0,
 		},
 	})
 }

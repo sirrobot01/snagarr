@@ -8,7 +8,6 @@ import (
 	"errors"
 	"fmt"
 	"os"
-	"strconv"
 	"strings"
 	"sync"
 	"time"
@@ -35,43 +34,13 @@ func (d *Duration) UnmarshalJSON(b []byte) error {
 	return nil
 }
 
+// TMDBSettings is the one catalogue key for the whole install. Every other
+// integration belongs to a member and lives in the services table.
 type TMDBSettings struct {
 	APIKey string `json:"api_key"`
 }
 
-type LibrarySettings struct {
-	Provider       string   `json:"provider"` // plex | emby | jellyfin
-	URL            string   `json:"url"`
-	Token          string   `json:"token"`
-	SectionIDs     []string `json:"section_ids"`
-	CollectionName string   `json:"collection_name"`
-}
-
-type ArrSettings struct {
-	URL              string `json:"url"`
-	APIKey           string `json:"api_key"`
-	QualityProfileID int    `json:"quality_profile_id"`
-	RootFolder       string `json:"root_folder"`
-	SeasonFolder     bool   `json:"season_folder"`
-	SearchOnAdd      bool   `json:"search_on_add"`
-}
-
-type OverseerrSettings struct {
-	URL    string `json:"url"`
-	APIKey string `json:"api_key"`
-}
-
-type NtfySettings struct {
-	URL      string `json:"url"`
-	Topic    string `json:"topic"`
-	Token    string `json:"token"`
-	Priority int    `json:"priority"`
-}
-
-type TelegramSettings struct {
-	BotToken string `json:"bot_token"`
-}
-
+// GeneralSettings are the install-wide knobs.
 type GeneralSettings struct {
 	ReconcileInterval Duration `json:"reconcile_interval"`
 	PublicURL         string   `json:"public_url"`
@@ -81,65 +50,45 @@ type GeneralSettings struct {
 	WebhookSecret string `json:"webhook_secret"`
 }
 
+// Settings is what stays global once every integration belongs to a member:
+// the catalogue key and the install-wide knobs.
 type Settings struct {
-	TMDB      TMDBSettings      `json:"tmdb"`
-	Library   LibrarySettings   `json:"library"`
-	Radarr    ArrSettings       `json:"radarr"`
-	Sonarr    ArrSettings       `json:"sonarr"`
-	Overseerr OverseerrSettings `json:"overseerr"`
-	Ntfy      NtfySettings      `json:"ntfy"`
-	Telegram  TelegramSettings  `json:"telegram"`
-	General   GeneralSettings   `json:"general"`
+	TMDB    TMDBSettings    `json:"tmdb"`
+	General GeneralSettings `json:"general"`
 }
 
+// Configured reports whether TMDB can be searched.
 func (s TMDBSettings) Configured() bool { return s.APIKey != "" }
-func (s LibrarySettings) Configured() bool {
-	return s.Provider != "" && s.URL != "" && s.Token != ""
-}
-func (s ArrSettings) Configured() bool       { return s.URL != "" && s.APIKey != "" }
-func (s OverseerrSettings) Configured() bool { return s.URL != "" && s.APIKey != "" }
-func (s NtfySettings) Configured() bool      { return s.Topic != "" }
-func (s TelegramSettings) Configured() bool  { return s.BotToken != "" }
 
 func defaults() Settings {
-	return Settings{
-		Library: LibrarySettings{CollectionName: "Snagged"},
-		Radarr:  ArrSettings{SearchOnAdd: true},
-		Sonarr:  ArrSettings{SearchOnAdd: true, SeasonFolder: true},
-		Ntfy:    NtfySettings{URL: "https://ntfy.sh", Priority: 3},
-		General: GeneralSettings{ReconcileInterval: Duration(15 * time.Minute)},
-	}
+	return Settings{General: GeneralSettings{ReconcileInterval: Duration(15 * time.Minute)}}
 }
 
 // secretFields maps the dotted path of every secret to a pointer into s, so
 // masking, restoring and env overlays all work from one list.
 func (s *Settings) secretFields() map[string]*string {
-	return map[string]*string{
-		"tmdb.api_key":       &s.TMDB.APIKey,
-		"library.token":      &s.Library.Token,
-		"radarr.api_key":     &s.Radarr.APIKey,
-		"sonarr.api_key":     &s.Sonarr.APIKey,
-		"overseerr.api_key":  &s.Overseerr.APIKey,
-		"ntfy.token":         &s.Ntfy.Token,
-		"telegram.bot_token": &s.Telegram.BotToken,
-	}
+	return map[string]*string{"tmdb.api_key": &s.TMDB.APIKey}
 }
 
 const maskRunes = "••••"
 
-// Masked returns a copy safe to send to a client. Secrets keep their last four
-// characters so an operator can tell which key is stored.
+// Mask hides a secret, keeping its last four characters so an operator can tell
+// which key is stored.
+func Mask(secret string) string {
+	if secret == "" {
+		return ""
+	}
+	if len(secret) > 4 {
+		return maskRunes + secret[len(secret)-4:]
+	}
+	return maskRunes
+}
+
+// Masked returns a copy safe to send to a client.
 func (s Settings) Masked() Settings {
 	masked := s
 	for _, field := range masked.secretFields() {
-		if *field == "" {
-			continue
-		}
-		if len(*field) > 4 {
-			*field = maskRunes + (*field)[len(*field)-4:]
-		} else {
-			*field = maskRunes
-		}
+		*field = Mask(*field)
 	}
 	return masked
 }
@@ -152,9 +101,10 @@ func IsMasked(value string) bool { return strings.HasPrefix(value, maskRunes) }
 type Manager struct {
 	store *store.Store
 
-	mu      sync.RWMutex
-	current Settings
-	locked  map[string]bool
+	mu             sync.RWMutex
+	current        Settings
+	locked         map[string]bool
+	lockedServices map[int64]bool
 }
 
 const settingsKey = "settings"
@@ -196,6 +146,15 @@ func (m *Manager) Locked() map[string]bool {
 	return m.locked
 }
 
+// LockedServices reports the services the environment owns, by ID. They are
+// rewritten on every start, so the UI renders them read-only rather than
+// letting an operator edit a value the next restart will overwrite.
+func (m *Manager) LockedServices() map[int64]bool {
+	m.mu.RLock()
+	defer m.mu.RUnlock()
+	return m.lockedServices
+}
+
 // Apply merges a partial settings document over the current values. Unmarshal
 // does the merge: any field the client omits keeps what it already had.
 func (m *Manager) Apply(ctx context.Context, patch []byte) (Settings, error) {
@@ -233,71 +192,25 @@ func (m *Manager) persist(ctx context.Context) error {
 	return m.store.SetSetting(ctx, settingsKey, raw)
 }
 
-// overlayEnv lets a Docker-first operator configure everything without opening
+// overlayEnv lets a Docker-first operator configure the install without opening
 // the UI. Environment values win over anything stored, and are reported back so
-// the UI can show them as locked.
+// the UI can show them as locked. The per-member services are seeded separately
+// by SeedServices; only the global settings pass through here.
 func overlayEnv(s *Settings) map[string]bool {
 	locked := map[string]bool{}
 
 	strs := map[string]*string{
-		"SNAGARR_TMDB_API_KEY":       &s.TMDB.APIKey,
-		"SNAGARR_LIBRARY_PROVIDER":   &s.Library.Provider,
-		"SNAGARR_LIBRARY_URL":        &s.Library.URL,
-		"SNAGARR_LIBRARY_TOKEN":      &s.Library.Token,
-		"SNAGARR_LIBRARY_COLLECTION": &s.Library.CollectionName,
-		"SNAGARR_RADARR_URL":         &s.Radarr.URL,
-		"SNAGARR_RADARR_API_KEY":     &s.Radarr.APIKey,
-		"SNAGARR_RADARR_ROOT_FOLDER": &s.Radarr.RootFolder,
-		"SNAGARR_SONARR_URL":         &s.Sonarr.URL,
-		"SNAGARR_SONARR_API_KEY":     &s.Sonarr.APIKey,
-		"SNAGARR_SONARR_ROOT_FOLDER": &s.Sonarr.RootFolder,
-		"SNAGARR_OVERSEERR_URL":      &s.Overseerr.URL,
-		"SNAGARR_OVERSEERR_API_KEY":  &s.Overseerr.APIKey,
-		"SNAGARR_NTFY_URL":           &s.Ntfy.URL,
-		"SNAGARR_NTFY_TOPIC":         &s.Ntfy.Topic,
-		"SNAGARR_NTFY_TOKEN":         &s.Ntfy.Token,
-		"SNAGARR_TELEGRAM_BOT_TOKEN": &s.Telegram.BotToken,
-		"SNAGARR_PUBLIC_URL":         &s.General.PublicURL,
+		"SNAGARR_TMDB_API_KEY": &s.TMDB.APIKey,
+		"SNAGARR_PUBLIC_URL":   &s.General.PublicURL,
 	}
 	paths := map[string]string{
-		"SNAGARR_TMDB_API_KEY":       "tmdb.api_key",
-		"SNAGARR_LIBRARY_PROVIDER":   "library.provider",
-		"SNAGARR_LIBRARY_URL":        "library.url",
-		"SNAGARR_LIBRARY_TOKEN":      "library.token",
-		"SNAGARR_LIBRARY_COLLECTION": "library.collection_name",
-		"SNAGARR_RADARR_URL":         "radarr.url",
-		"SNAGARR_RADARR_API_KEY":     "radarr.api_key",
-		"SNAGARR_RADARR_ROOT_FOLDER": "radarr.root_folder",
-		"SNAGARR_SONARR_URL":         "sonarr.url",
-		"SNAGARR_SONARR_API_KEY":     "sonarr.api_key",
-		"SNAGARR_SONARR_ROOT_FOLDER": "sonarr.root_folder",
-		"SNAGARR_OVERSEERR_URL":      "overseerr.url",
-		"SNAGARR_OVERSEERR_API_KEY":  "overseerr.api_key",
-		"SNAGARR_NTFY_URL":           "ntfy.url",
-		"SNAGARR_NTFY_TOPIC":         "ntfy.topic",
-		"SNAGARR_NTFY_TOKEN":         "ntfy.token",
-		"SNAGARR_TELEGRAM_BOT_TOKEN": "telegram.bot_token",
-		"SNAGARR_PUBLIC_URL":         "general.public_url",
+		"SNAGARR_TMDB_API_KEY": "tmdb.api_key",
+		"SNAGARR_PUBLIC_URL":   "general.public_url",
 	}
 	for name, field := range strs {
 		if v := os.Getenv(name); v != "" {
 			*field = v
 			locked[paths[name]] = true
-		}
-	}
-
-	ints := map[string]*int{
-		"SNAGARR_RADARR_QUALITY_PROFILE_ID": &s.Radarr.QualityProfileID,
-		"SNAGARR_SONARR_QUALITY_PROFILE_ID": &s.Sonarr.QualityProfileID,
-	}
-	intPaths := map[string]string{
-		"SNAGARR_RADARR_QUALITY_PROFILE_ID": "radarr.quality_profile_id",
-		"SNAGARR_SONARR_QUALITY_PROFILE_ID": "sonarr.quality_profile_id",
-	}
-	for name, field := range ints {
-		if v, err := strconv.Atoi(os.Getenv(name)); err == nil {
-			*field = v
-			locked[intPaths[name]] = true
 		}
 	}
 

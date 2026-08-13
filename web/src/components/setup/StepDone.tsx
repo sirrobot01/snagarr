@@ -14,7 +14,6 @@ const SERVICES: { key: ServiceKey; name: string }[] = [
   { key: 'sonarr', name: 'Sonarr' },
   { key: 'overseerr', name: 'Overseerr' },
   { key: 'ntfy', name: 'ntfy' },
-  { key: 'telegram', name: 'Telegram' },
 ];
 
 export function StepDone({ settings }: { settings: Settings }) {
@@ -66,7 +65,7 @@ export function StepDone({ settings }: { settings: Settings }) {
       )}
 
       <ol className="m-0 flex list-decimal flex-col gap-1 pl-4 text-[13px] text-muted">
-        <li>Paste the token into the iOS Shortcut and the Telegram bot.</li>
+        <li>Paste the token into the iOS Shortcut.</li>
         <li>Invite the rest of the household under Settings.</li>
         <li>Snag something — the first library index runs in the background.</li>
       </ol>

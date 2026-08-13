@@ -38,12 +38,18 @@ type Engine struct {
 	trigger chan struct{}
 }
 
-// syncState is persisted so restarts do not force a full library sweep.
+// syncState is persisted so restarts do not force a full library sweep. The
+// library stamps are per service: a media server a member connects today must
+// get its own first full sweep, whatever the others did yesterday.
 type syncState struct {
-	LibraryAt    time.Time `json:"library_at"`
-	FullSweepAt  time.Time `json:"full_sweep_at"`
-	ArrAt        time.Time `json:"arr_at"`
-	CollectionAt time.Time `json:"collection_at"`
+	Library      map[int64]librarySync `json:"library"`
+	ArrAt        time.Time             `json:"arr_at"`
+	CollectionAt time.Time             `json:"collection_at"`
+}
+
+type librarySync struct {
+	SyncedAt    time.Time `json:"synced_at"`
+	FullSweepAt time.Time `json:"full_sweep_at"`
 }
 
 const syncStateKey = "sync_state"
@@ -53,6 +59,9 @@ func New(s *store.Store, settings *config.Manager, log *slog.Logger) *Engine {
 	// Unreadable sync state only costs one extra full sweep.
 	if raw, err := s.Setting(context.Background(), syncStateKey); err == nil {
 		_ = json.Unmarshal(raw, &e.state)
+	}
+	if e.state.Library == nil {
+		e.state.Library = map[int64]librarySync{}
 	}
 	return e
 }
@@ -69,8 +78,17 @@ type Status struct {
 func (e *Engine) Status() Status {
 	e.mu.Lock()
 	defer e.mu.Unlock()
+
+	// The household has one footer, so the most recent sweep speaks for all of
+	// the media servers.
+	var library time.Time
+	for _, l := range e.state.Library {
+		if l.SyncedAt.After(library) {
+			library = l.SyncedAt
+		}
+	}
 	return Status{
-		LibraryAt:    syncedAt(e.state.LibraryAt),
+		LibraryAt:    syncedAt(library),
 		ArrAt:        syncedAt(e.state.ArrAt),
 		CollectionAt: syncedAt(e.state.CollectionAt),
 		Running:      e.running.Load(),
@@ -121,8 +139,9 @@ func (e *Engine) runLogged(ctx context.Context) {
 	}
 }
 
-// Run performs one full pass. Individual sync failures are logged and skipped
-// rather than aborting: a stale index still answers, and the next pass retries.
+// Run performs one full pass over every member's services. Individual sync
+// failures are logged and skipped rather than aborting: a stale index still
+// answers, and the next pass retries.
 func (e *Engine) Run(ctx context.Context) error {
 	if !e.running.CompareAndSwap(false, true) {
 		return nil
@@ -131,22 +150,25 @@ func (e *Engine) Run(ctx context.Context) error {
 
 	started := time.Now()
 	settings := e.settings.Get()
-	set := clients.Build(settings, e.store.HTTPCache())
+	house, err := e.household(ctx)
+	if err != nil {
+		return err
+	}
 
-	e.syncArr(ctx, set)
-	e.syncRequests(ctx, set)
-	e.syncLibrary(ctx, set, settings)
+	e.syncArr(ctx, house)
+	e.syncRequests(ctx, house)
+	e.syncLibrary(ctx, house)
 
 	index, err := e.store.LoadStateIndex(ctx)
 	if err != nil {
 		return err
 	}
-	available, err := e.applyStates(ctx, set, index, settings)
+	available, err := e.applyStates(ctx, house, index, settings)
 	if err != nil {
 		return err
 	}
-	e.syncCollection(ctx, set, settings, index)
-	e.refreshEntities(ctx, set)
+	e.syncCollection(ctx, house)
+	e.refreshEntities(ctx, settings)
 
 	if err := e.store.PurgeExpiredCache(ctx); err != nil {
 		e.log.Warn("could not purge response cache", "error", err)
@@ -157,101 +179,124 @@ func (e *Engine) Run(ctx context.Context) error {
 	return nil
 }
 
-func (e *Engine) syncArr(ctx context.Context, set clients.Set) {
-	if set.Radarr != nil {
-		items, err := set.Radarr.List(ctx)
-		if err != nil {
-			e.log.Warn("radarr sync failed", "error", err)
-		} else if err := e.store.ReplaceArrIndex(ctx, "radarr", toArrEntries("radarr", items)); err != nil {
-			e.log.Warn("radarr index write failed", "error", err)
-		} else {
-			e.mark(&e.state.ArrAt)
-		}
-	}
-	if set.Sonarr != nil {
-		items, err := set.Sonarr.List(ctx)
-		if err != nil {
-			e.log.Warn("sonarr sync failed", "error", err)
-		} else if err := e.store.ReplaceArrIndex(ctx, "sonarr", toArrEntries("sonarr", items)); err != nil {
-			e.log.Warn("sonarr index write failed", "error", err)
-		} else {
-			e.mark(&e.state.ArrAt)
-		}
-	}
-}
-
-func (e *Engine) syncRequests(ctx context.Context, set clients.Set) {
-	if set.Overseerr == nil {
-		return
-	}
-	requests, err := set.Overseerr.List(ctx)
+// household builds every enabled service in the install. A record that cannot
+// be decoded is reported and left out, so one bad row never costs a pass.
+func (e *Engine) household(ctx context.Context) (clients.Household, error) {
+	services, err := e.store.Services(ctx)
 	if err != nil {
-		e.log.Warn("overseerr sync failed", "error", err)
-		return
+		return clients.Household{}, err
 	}
-	entries := make([]store.RequestEntry, 0, len(requests))
-	for _, r := range requests {
-		entries = append(entries, store.RequestEntry{
-			RequestID: r.ID, TMDBID: int64(r.TMDBID), MediaType: r.Type, Status: r.Status,
-		})
+	house, err := clients.BuildHousehold(services)
+	if err != nil {
+		e.log.Warn("some services could not be built", "error", err)
 	}
-	if err := e.store.ReplaceRequests(ctx, entries); err != nil {
-		e.log.Warn("request index write failed", "error", err)
+	return house, nil
+}
+
+func (e *Engine) syncArr(ctx context.Context, house clients.Household) {
+	for _, r := range house.Radarrs {
+		items, err := r.Client.List(ctx)
+		if err != nil {
+			e.log.Warn("radarr sync failed", "service", r.Service.ID, "name", r.Service.Name, "error", err)
+			continue
+		}
+		if err := e.store.ReplaceArrIndex(ctx, r.Service.ID, toArrEntries(items)); err != nil {
+			e.log.Warn("radarr index write failed", "service", r.Service.ID, "error", err)
+			continue
+		}
+		e.mark(&e.state.ArrAt)
+	}
+	for _, s := range house.Sonarrs {
+		items, err := s.Client.List(ctx)
+		if err != nil {
+			e.log.Warn("sonarr sync failed", "service", s.Service.ID, "name", s.Service.Name, "error", err)
+			continue
+		}
+		if err := e.store.ReplaceArrIndex(ctx, s.Service.ID, toArrEntries(items)); err != nil {
+			e.log.Warn("sonarr index write failed", "service", s.Service.ID, "error", err)
+			continue
+		}
+		e.mark(&e.state.ArrAt)
 	}
 }
 
-func (e *Engine) syncLibrary(ctx context.Context, set clients.Set, settings config.Settings) {
-	if set.Library == nil {
-		return
+func (e *Engine) syncRequests(ctx context.Context, house clients.Household) {
+	for _, o := range house.Overseerrs {
+		requests, err := o.Client.List(ctx)
+		if err != nil {
+			e.log.Warn("overseerr sync failed", "service", o.Service.ID, "name", o.Service.Name, "error", err)
+			continue
+		}
+		entries := make([]store.RequestEntry, 0, len(requests))
+		for _, r := range requests {
+			entries = append(entries, store.RequestEntry{
+				RequestID: r.ID, TMDBID: int64(r.TMDBID), MediaType: r.Type, Status: r.Status,
+			})
+		}
+		if err := e.store.ReplaceRequests(ctx, o.Service.ID, entries); err != nil {
+			e.log.Warn("request index write failed", "service", o.Service.ID, "error", err)
+		}
 	}
+}
+
+func (e *Engine) syncLibrary(ctx context.Context, house clients.Household) {
+	for _, lib := range house.Libraries {
+		e.syncLibraryService(ctx, lib)
+	}
+}
+
+func (e *Engine) syncLibraryService(ctx context.Context, lib clients.Library) {
 	e.mu.Lock()
-	lastFull, lastSync := e.state.FullSweepAt, e.state.LibraryAt
+	last := e.state.Library[lib.Service.ID]
 	e.mu.Unlock()
 
-	full := time.Since(lastFull) > fullSweepInterval
-	since := lastSync
+	full := time.Since(last.FullSweepAt) > fullSweepInterval
+	since := last.SyncedAt
 	if full {
 		since = time.Time{}
 	}
 
 	sweepStart := time.Now().UTC()
-	items, err := set.Library.Items(ctx, settings.Library.SectionIDs, since)
+	items, err := lib.Client.Items(ctx, lib.Config.SectionIDs, since)
 	if err != nil {
-		e.log.Warn("library sync failed", "error", err)
+		e.log.Warn("library sync failed", "service", lib.Service.ID, "name", lib.Service.Name, "error", err)
 		return
 	}
 
 	entries := make([]store.LibraryEntry, 0, len(items))
 	for _, it := range items {
 		entries = append(entries, store.LibraryEntry{
-			Provider: settings.Library.Provider, ProviderItemID: it.ProviderItemID,
-			TMDBID: int64(it.TMDBID), IMDBID: it.IMDBID, TVDBID: int64(it.TVDBID),
+			ProviderItemID: it.ProviderItemID,
+			TMDBID:         int64(it.TMDBID), IMDBID: it.IMDBID, TVDBID: int64(it.TVDBID),
 			MediaType: it.Type, Title: it.Title, Year: it.Year, AddedAt: it.AddedAt,
 		})
 	}
-	if err := e.store.UpsertLibrary(ctx, entries); err != nil {
-		e.log.Warn("library index write failed", "error", err)
+	if err := e.store.UpsertLibrary(ctx, lib.Service.ID, entries); err != nil {
+		e.log.Warn("library index write failed", "service", lib.Service.ID, "error", err)
 		return
 	}
 
 	if full {
-		removed, err := e.store.TombstoneLibrary(ctx, settings.Library.Provider, sweepStart)
+		removed, err := e.store.TombstoneLibrary(ctx, lib.Service.ID, sweepStart)
 		if err != nil {
-			e.log.Warn("library tombstone failed", "error", err)
+			e.log.Warn("library tombstone failed", "service", lib.Service.ID, "error", err)
 		} else if removed > 0 {
-			e.log.Info("library titles removed", "count", removed)
+			e.log.Info("library titles removed", "service", lib.Service.ID, "count", removed)
 		}
-		e.mark(&e.state.FullSweepAt)
+		last.FullSweepAt = time.Now().UTC()
 	}
+	last.SyncedAt = sweepStart
+
 	e.mu.Lock()
-	e.state.LibraryAt = sweepStart
+	e.state.Library[lib.Service.ID] = last
 	e.mu.Unlock()
-	e.log.Debug("library synced", "titles", len(entries), "full", full)
+	e.log.Debug("library synced", "service", lib.Service.ID, "titles", len(entries), "full", full)
 }
 
 // applyStates recomputes every snagged item's status from the local indexes and
 // notifies on the transitions that matter.
-func (e *Engine) applyStates(ctx context.Context, set clients.Set, index *store.StateIndex, settings config.Settings) (int, error) {
+func (e *Engine) applyStates(ctx context.Context, house clients.Household, index *store.StateIndex,
+	settings config.Settings) (int, error) {
 	items, err := e.store.SnaggedItems(ctx)
 	if err != nil {
 		return 0, err
@@ -260,6 +305,7 @@ func (e *Engine) applyStates(ctx context.Context, set clients.Set, index *store.
 	if err != nil {
 		return 0, err
 	}
+	admins := e.adminIDs(ctx)
 
 	var becameAvailable int
 	for _, it := range items {
@@ -286,7 +332,7 @@ func (e *Engine) applyStates(ctx context.Context, set clients.Set, index *store.
 
 		if next == store.StatusAvailable && it.NotifiedAt.IsZero() {
 			becameAvailable++
-			e.notifyAvailable(ctx, set, settings, it)
+			e.notifyAvailable(ctx, house, settings, admins, it)
 		}
 	}
 	return becameAvailable, nil
@@ -294,8 +340,12 @@ func (e *Engine) applyStates(ctx context.Context, set clients.Set, index *store.
 
 // notifyAvailable carries the original capture context, which is the whole
 // point of the nudge: the reminder has to say why this title is on the list.
-func (e *Engine) notifyAvailable(ctx context.Context, set clients.Set, settings config.Settings, it store.Item) {
-	if set.Ntfy == nil {
+// The push goes to the capturer's own ntfy, and to an admin's when they have
+// none — an unowned push still has to reach somebody.
+func (e *Engine) notifyAvailable(ctx context.Context, house clients.Household, settings config.Settings,
+	admins []int64, it store.Item) {
+	target := house.NtfyFor(append([]int64{it.CapturedBy}, admins...)...)
+	if target == nil {
 		return
 	}
 	body := it.Title + " is ready"
@@ -313,12 +363,12 @@ func (e *Engine) notifyAvailable(ctx context.Context, set clients.Set, settings 
 		Title:    "Ready to watch",
 		Body:     body,
 		Tags:     []string{"clapper"},
-		Priority: settings.Ntfy.Priority,
+		Priority: target.Config.Priority,
 	}
 	if settings.General.PublicURL != "" {
 		msg.ClickURL = settings.General.PublicURL
 	}
-	if err := set.Ntfy.Send(ctx, msg); err != nil {
+	if err := target.Client.Send(ctx, msg); err != nil {
 		e.log.Warn("availability notification failed", "item", it.ID, "error", err)
 		return
 	}
@@ -327,10 +377,12 @@ func (e *Engine) notifyAvailable(ctx context.Context, set clients.Set, settings 
 	}
 }
 
-// syncCollection applies (snagged ∩ available) − watched to the media server.
-// This is the only place Snagarr mutates the library.
-func (e *Engine) syncCollection(ctx context.Context, set clients.Set, settings config.Settings, index *store.StateIndex) {
-	if set.Library == nil || settings.Library.CollectionName == "" {
+// syncCollection applies (snagged ∩ available) − watched to every media server.
+// This is the only place Snagarr mutates a library. Collections are personal:
+// each server gets the snagged titles it actually holds, and never a title that
+// only exists on somebody else's.
+func (e *Engine) syncCollection(ctx context.Context, house clients.Household) {
+	if len(house.Libraries) == 0 {
 		return
 	}
 	items, err := e.store.SnaggedItems(ctx)
@@ -338,27 +390,41 @@ func (e *Engine) syncCollection(ctx context.Context, set clients.Set, settings c
 		e.log.Warn("could not read snagged items", "error", err)
 		return
 	}
-
-	var members []string
-	for _, it := range items {
-		if it.Status != store.StatusAvailable {
-			continue
-		}
-		if id, ok := index.Library[store.TitleKey{TMDBID: it.TMDBID, MediaType: it.MediaType}]; ok {
-			members = append(members, id)
-		}
-	}
-
-	if err := set.Library.SyncCollection(ctx, settings.Library.CollectionName, members); err != nil {
-		e.log.Warn("collection sync failed", "collection", settings.Library.CollectionName, "error", err)
+	held, err := e.store.LibraryMembers(ctx)
+	if err != nil {
+		e.log.Warn("could not read library members", "error", err)
 		return
 	}
-	e.mark(&e.state.CollectionAt)
-	e.log.Debug("collection synced", "collection", settings.Library.CollectionName, "members", len(members))
+
+	for _, lib := range house.Libraries {
+		if lib.Config.CollectionName == "" {
+			continue
+		}
+		titles := held[lib.Service.ID]
+		var members []string
+		for _, it := range items {
+			if it.Status != store.StatusAvailable {
+				continue
+			}
+			if id, ok := titles[store.TitleKey{TMDBID: it.TMDBID, MediaType: it.MediaType}]; ok {
+				members = append(members, id)
+			}
+		}
+
+		if err := lib.Client.SyncCollection(ctx, lib.Config.CollectionName, members); err != nil {
+			e.log.Warn("collection sync failed", "service", lib.Service.ID,
+				"collection", lib.Config.CollectionName, "error", err)
+			continue
+		}
+		e.mark(&e.state.CollectionAt)
+		e.log.Debug("collection synced", "service", lib.Service.ID,
+			"collection", lib.Config.CollectionName, "members", len(members))
+	}
 }
 
-func (e *Engine) refreshEntities(ctx context.Context, set clients.Set) {
-	if set.TMDB == nil {
+func (e *Engine) refreshEntities(ctx context.Context, settings config.Settings) {
+	catalogue := clients.TMDB(settings, e.store.HTTPCache())
+	if catalogue == nil {
 		return
 	}
 	stale, err := e.store.StaleSnaggedTitles(ctx, entityTTL)
@@ -367,7 +433,7 @@ func (e *Engine) refreshEntities(ctx context.Context, set clients.Set) {
 		return
 	}
 	for _, key := range stale {
-		details, err := set.TMDB.Details(ctx, key.MediaType, int(key.TMDBID))
+		details, err := catalogue.Details(ctx, key.MediaType, int(key.TMDBID))
 		if err != nil {
 			e.log.Debug("metadata refresh failed", "tmdb_id", key.TMDBID, "error", err)
 			continue
@@ -425,10 +491,12 @@ func (e *Engine) MarkAvailable(ctx context.Context, tmdbID int64, t media.Type) 
 		return err
 	}
 
-	settings := e.settings.Get()
-	set := clients.Build(settings, e.store.HTTPCache())
 	if it.NotifiedAt.IsZero() {
-		e.notifyAvailable(ctx, set, settings, *it)
+		house, err := e.household(ctx)
+		if err != nil {
+			return err
+		}
+		e.notifyAvailable(ctx, house, e.settings.Get(), e.adminIDs(ctx), *it)
 	}
 	e.Trigger()
 	return nil
@@ -454,6 +522,23 @@ func (e *Engine) MarkWatched(ctx context.Context, tmdbID int64, t media.Type, so
 	return nil
 }
 
+// adminIDs is the last resort for a personal service: a household that has to
+// act on somebody's behalf falls back to whoever runs the install.
+func (e *Engine) adminIDs(ctx context.Context) []int64 {
+	users, err := e.store.Users(ctx)
+	if err != nil {
+		e.log.Warn("could not list household members", "error", err)
+		return nil
+	}
+	var ids []int64
+	for _, u := range users {
+		if u.Role == store.RoleAdmin {
+			ids = append(ids, u.ID)
+		}
+	}
+	return ids
+}
+
 func (e *Engine) mark(field *time.Time) {
 	e.mu.Lock()
 	defer e.mu.Unlock()
@@ -472,11 +557,11 @@ func (e *Engine) persistState(ctx context.Context) {
 	}
 }
 
-func toArrEntries(source string, items []arr.Item) []store.ArrEntry {
+func toArrEntries(items []arr.Item) []store.ArrEntry {
 	entries := make([]store.ArrEntry, 0, len(items))
 	for _, it := range items {
 		entries = append(entries, store.ArrEntry{
-			Source: source, ArrID: it.ID, TMDBID: int64(it.TMDBID), TVDBID: int64(it.TVDBID),
+			ArrID: it.ID, TMDBID: int64(it.TMDBID), TVDBID: int64(it.TVDBID),
 			IMDBID: it.IMDBID, Title: it.Title, Year: it.Year,
 			Monitored: it.Monitored, HasFile: it.HasFile, QualityProfileID: it.QualityProfileID,
 		})

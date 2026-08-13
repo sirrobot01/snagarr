@@ -1,0 +1,37 @@
+/* Accent: #ff563c = hsl(8, 100%, 62%). */
+:root {
+	--sl-color-accent-low: hsl(8, 54%, 20%);
+	--sl-color-accent: hsl(8, 100%, 62%);
+	--sl-color-accent-high: hsl(8, 100%, 84%);
+	--snagarr-font-headings: 'Archivo', var(--sl-font-system);
+}
+
+:root[data-theme='light'] {
+	--sl-color-accent-low: hsl(8, 88%, 90%);
+	--sl-color-accent: hsl(8, 90%, 52%);
+	--sl-color-accent-high: hsl(8, 80%, 28%);
+}
+
+h1,
+h2,
+h3,
+h4,
+h5,
+h6,
+.site-title {
+	font-family: var(--snagarr-font-headings);
+	letter-spacing: -0.01em;
+}
+
+.site-title {
+	font-weight: 700;
+}
+
+/* Reference tables carry most of the content. Keep them compact. */
+.sl-markdown-content table {
+	font-size: var(--sl-text-sm);
+}
+
+.sl-markdown-content code {
+	font-size: 0.9em;
+}

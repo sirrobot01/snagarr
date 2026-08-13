@@ -164,7 +164,6 @@ export interface ArrSettings {
 export interface OverseerrSettings {
   url: string;
   api_key: string;
-  prefer: boolean;
   configured: boolean;
   locked?: boolean;
 }
@@ -182,10 +181,13 @@ export interface TelegramSettings {
   locked?: boolean;
 }
 export interface GeneralSettings {
+  /** Go duration string. The reconcile loop re-reads it, so a change needs no restart. */
   reconcile_interval: string;
-  stale_days: number;
   public_url: string;
-  image_base: string;
+  /** Returned in clear text on purpose — the operator pastes it into Radarr. */
+  webhook_secret: string;
+  configured: boolean;
+  locked?: boolean;
 }
 
 export interface Settings {

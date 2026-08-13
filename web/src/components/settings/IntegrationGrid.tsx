@@ -1,6 +1,7 @@
-import { NtfyCard, OverseerrCard, TelegramCard, TmdbCard } from './ApiCards';
+import { NtfyCard, OverseerrCard, TmdbCard } from './ApiCards';
 import { ArrCard } from './ArrCard';
 import type { CardProps } from './draft';
+import { GeneralCard } from './GeneralCard';
 import { LibraryCard } from './LibraryCard';
 
 export function IntegrationGrid({ settings, draft }: CardProps) {
@@ -12,7 +13,7 @@ export function IntegrationGrid({ settings, draft }: CardProps) {
       <ArrCard service="sonarr" name="Sonarr" settings={settings} draft={draft} />
       <OverseerrCard settings={settings} draft={draft} />
       <NtfyCard settings={settings} draft={draft} />
-      <TelegramCard settings={settings} draft={draft} />
+      <GeneralCard settings={settings} draft={draft} />
     </div>
   );
 }

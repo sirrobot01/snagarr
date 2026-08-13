@@ -278,8 +278,14 @@ func TestSettingsMaskSecrets(t *testing.T) {
 	if configured, _ := got["tmdb"]["configured"].(bool); !configured {
 		t.Error("tmdb.configured = false after setting a key")
 	}
-	if _, ok := got["radarr"]["locked"]; !ok {
+	if _, ok := got["tmdb"]["locked"]; !ok {
 		t.Error("sections carry no locked flag; the settings UI needs it")
+	}
+	// Every integration except TMDB is a service now.
+	for _, gone := range []string{"library", "radarr", "sonarr", "overseerr", "ntfy", "telegram"} {
+		if _, ok := got[gone]; ok {
+			t.Errorf("settings still carry the %q section", gone)
+		}
 	}
 
 	// Echoing the mask back must not overwrite the stored secret.
@@ -294,6 +300,114 @@ func TestSettingsMaskSecrets(t *testing.T) {
 		t.Fatalf("read stored settings: %v", err)
 	}
 	if !bytes.Contains(stored, []byte("super-secret-4e2a")) {
+		t.Error("echoing the mask back overwrote the stored secret")
+	}
+}
+
+type servicesResponse struct {
+	Services []serviceDTO `json:"services"`
+}
+
+// Every member owns their own stack: they may build and change it, and nobody
+// else's.
+func TestServiceOwnership(t *testing.T) {
+	h := newHarness(t)
+
+	resp := h.do(t, http.MethodPost, "/api/v1/services", h.memberToken, map[string]any{
+		"kind": "radarr", "name": "Amina's",
+		"config": map[string]any{"url": "http://radarr:7878", "api_key": "member-key-4e2a"},
+	})
+	if resp.StatusCode != http.StatusCreated {
+		t.Fatalf("POST /services as member = %d, want 201", resp.StatusCode)
+	}
+	memberService := decodeBody[serviceDTO](t, resp)
+	if memberService.UserID != h.member.ID {
+		t.Errorf("service owner = %d, want the calling member %d", memberService.UserID, h.member.ID)
+	}
+	if secret, _ := memberService.Config["api_key"].(string); !config.IsMasked(secret) {
+		t.Errorf("api_key = %q, want it masked", secret)
+	}
+	if searchOnAdd, _ := memberService.Config["search_on_add"].(bool); !searchOnAdd {
+		t.Error("the kind's defaults were not applied to a new service")
+	}
+
+	resp = h.do(t, http.MethodPost, "/api/v1/services", h.adminToken, map[string]any{
+		"kind": "sonarr", "config": map[string]any{"url": "http://sonarr:8989", "api_key": "admin-key"},
+	})
+	if resp.StatusCode != http.StatusCreated {
+		t.Fatalf("POST /services as admin = %d, want 201", resp.StatusCode)
+	}
+	adminService := decodeBody[serviceDTO](t, resp)
+
+	listed := decodeBody[servicesResponse](t, h.do(t, http.MethodGet, "/api/v1/services", h.memberToken, nil))
+	if len(listed.Services) != 1 || listed.Services[0].ID != memberService.ID {
+		t.Errorf("member sees %v, want only their own service", listed.Services)
+	}
+
+	// Another member's service is out of reach.
+	adminPath := "/api/v1/services/" + strconv.FormatInt(adminService.ID, 10)
+	for _, route := range []struct{ method, path string }{
+		{http.MethodPatch, adminPath},
+		{http.MethodDelete, adminPath},
+		{http.MethodPost, adminPath + "/test"},
+		{http.MethodGet, adminPath + "/options"},
+	} {
+		if resp := h.do(t, route.method, route.path, h.memberToken, map[string]any{}); resp.StatusCode != http.StatusForbidden {
+			t.Errorf("%s %s as member = %d, want 403", route.method, route.path, resp.StatusCode)
+		}
+	}
+
+	// An admin reaches everybody's.
+	memberPath := "/api/v1/services/" + strconv.FormatInt(memberService.ID, 10)
+	if resp := h.do(t, http.MethodPatch, memberPath, h.adminToken, map[string]any{"enabled": false}); resp.StatusCode != http.StatusOK {
+		t.Errorf("admin patching a member's service = %d, want 200", resp.StatusCode)
+	}
+	memberServices := "/api/v1/users/" + strconv.FormatInt(h.member.ID, 10) + "/services"
+	if resp := h.do(t, http.MethodGet, memberServices, h.memberToken, nil); resp.StatusCode != http.StatusForbidden {
+		t.Errorf("member reading the household view = %d, want 403", resp.StatusCode)
+	}
+	listed = decodeBody[servicesResponse](t, h.do(t, http.MethodGet, memberServices, h.adminToken, nil))
+	if len(listed.Services) != 1 || listed.Services[0].Enabled {
+		t.Errorf("admin view of the member's services = %v, want the disabled one", listed.Services)
+	}
+
+	if resp := h.do(t, http.MethodDelete, memberPath, h.memberToken, nil); resp.StatusCode != http.StatusNoContent {
+		t.Errorf("member deleting their own service = %d, want 204", resp.StatusCode)
+	}
+}
+
+// A client only ever sees a masked credential, so echoing it back must leave
+// the stored one alone.
+func TestServiceSecretsRoundTrip(t *testing.T) {
+	h := newHarness(t)
+
+	resp := h.do(t, http.MethodPost, "/api/v1/services", h.adminToken, map[string]any{
+		"kind":   "radarr",
+		"config": map[string]any{"url": "http://radarr:7878", "api_key": "super-secret-4e2a"},
+	})
+	if resp.StatusCode != http.StatusCreated {
+		t.Fatalf("POST /services = %d, want 201", resp.StatusCode)
+	}
+	created := decodeBody[serviceDTO](t, resp)
+	masked, _ := created.Config["api_key"].(string)
+	if masked == "super-secret-4e2a" {
+		t.Fatal("the API key came back in clear text")
+	}
+
+	resp = h.do(t, http.MethodPatch, "/api/v1/services/"+strconv.FormatInt(created.ID, 10), h.adminToken,
+		map[string]any{"config": map[string]any{"api_key": masked, "root_folder": "/data/movies"}})
+	if resp.StatusCode != http.StatusOK {
+		t.Fatalf("PATCH /services = %d, want 200", resp.StatusCode)
+	}
+	if got := decodeBody[serviceDTO](t, resp); got.Config["root_folder"] != "/data/movies" {
+		t.Errorf("root_folder = %v, want the patched value", got.Config["root_folder"])
+	}
+
+	stored, err := h.store.Service(context.Background(), created.ID)
+	if err != nil {
+		t.Fatalf("read stored service: %v", err)
+	}
+	if !bytes.Contains(stored.Config, []byte("super-secret-4e2a")) {
 		t.Error("echoing the mask back overwrote the stored secret")
 	}
 }
