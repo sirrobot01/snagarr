@@ -93,25 +93,25 @@ func (e *Engine) Trigger() {
 	}
 }
 
-// Start runs the loop until ctx is cancelled.
+// Start runs the loop until ctx is cancelled. The interval is read before each
+// wait, so changing it in settings takes effect without a restart.
 func (e *Engine) Start(ctx context.Context) {
-	interval := time.Duration(e.settings.Get().General.ReconcileInterval)
-	if interval <= 0 {
-		interval = 15 * time.Minute
-	}
-	ticker := time.NewTicker(interval)
-	defer ticker.Stop()
-
 	e.runLogged(ctx)
 	for {
+		interval := time.Duration(e.settings.Get().General.ReconcileInterval)
+		if interval <= 0 {
+			interval = 15 * time.Minute
+		}
+		timer := time.NewTimer(interval)
 		select {
 		case <-ctx.Done():
+			timer.Stop()
 			return
 		case <-e.trigger:
-			e.runLogged(ctx)
-		case <-ticker.C:
-			e.runLogged(ctx)
+			timer.Stop()
+		case <-timer.C:
 		}
+		e.runLogged(ctx)
 	}
 }
 

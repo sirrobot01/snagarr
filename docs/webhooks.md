@@ -1,7 +1,7 @@
 # Webhooks
 
 Webhooks tell Snagarr about a change at once. Without them, Snagarr finds the
-same change on its next reconcile pass, up to 15 minutes later.
+same change on its next reconcile pass. The default interval is 15 minutes.
 
 > Webhooks are an accelerator. The reconcile loop is the backstop. Snagarr
 > works correctly with no webhook configured. It is only slower to react.
@@ -55,12 +55,12 @@ It is stored as `general.webhook_secret`.
 1. Make a value: `openssl rand -hex 16`.
 2. Write it with an admin token:
 
-```sh
-curl -X PUT http://localhost:8080/api/v1/settings \
-  -H "Authorization: Bearer sngr_your_admin_token" \
-  -H "Content-Type: application/json" \
-  -d '{"general":{"webhook_secret":"8f3c1a9e5d2b740c6e1f8a3d9b0c2e47"}}'
-```
+   ```sh
+   curl -X PUT http://localhost:8080/api/v1/settings \
+     -H "Authorization: Bearer sngr_your_admin_token" \
+     -H "Content-Type: application/json" \
+     -d '{"general":{"webhook_secret":"8f3c1a9e5d2b740c6e1f8a3d9b0c2e47"}}'
+   ```
 
 3. Use that value in every webhook URL.
 
@@ -272,7 +272,7 @@ Check the result with `GET /api/v1/items`. The item status must change.
 
 Work through this list:
 
-1. Check the secret. A wrong secret returns `401`, and most senders log it.
+1. Check the secret. A wrong secret returns `401`. Most senders log that status.
 2. Check the service name in the path. An unknown name returns `404`.
 3. Check that the title is snagged in Snagarr. Webhooks only update existing
    items. They never create one.

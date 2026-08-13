@@ -35,6 +35,7 @@ func (s *Server) Handler() http.Handler {
 	r.Use(middleware.RequestID, middleware.Recoverer, s.logRequests)
 
 	r.Route("/api/v1", func(r chi.Router) {
+		r.Use(allowCrossOrigin)
 		r.Get("/health", s.health)
 		// Webhook senders authenticate with a shared secret in the query
 		// string, because Radarr, Tautulli and Emby cannot all set headers.
@@ -104,7 +105,6 @@ func (s *Server) status(w http.ResponseWriter, r *http.Request) {
 			"sonarr":    settings.Sonarr.Configured(),
 			"overseerr": settings.Overseerr.Configured(),
 			"ntfy":      settings.Ntfy.Configured(),
-			"telegram":  settings.Telegram.Configured(),
 		},
 	})
 }

@@ -225,7 +225,7 @@ configured. Nothing reads it. See [clients.md](clients.md).
 
 | Field | Type | Default | Environment variable |
 |-------|------|---------|----------------------|
-| `general.reconcile_interval` | duration string | `15m` | `SNAGARR_RECONCILE_INTERVAL` |
+| `general.reconcile_interval` | duration string | `15m0s` | `SNAGARR_RECONCILE_INTERVAL` |
 | `general.public_url` | string | *(empty)* | `SNAGARR_PUBLIC_URL` |
 | `general.webhook_secret` | string | *(generated)* | *(none)* |
 | `general.stale_days` | integer | `90` | *(none)* |
@@ -233,6 +233,9 @@ configured. Nothing reads it. See [clients.md](clients.md).
 
 `general.reconcile_interval` is a Go duration string, for example `15m`, `1h`
 or `90s`. A value of zero or less falls back to 15 minutes.
+
+Snagarr writes the value back in its long form. Send `15m` and read `15m0s`.
+Both mean the same interval.
 
 > Snagarr reads the interval once, at start-up. Restart the process after you
 > change it.
@@ -242,7 +245,8 @@ example `https://snagarr.example.com`. Snagarr uses it for the ntfy click link.
 The settings UI uses it to build the bookmarklet.
 
 `general.webhook_secret` authenticates every inbound webhook. Snagarr generates
-32 hexadecimal characters on first start. See [webhooks.md](webhooks.md).
+32 hexadecimal characters on first start. It is masked like every other secret,
+so you cannot read it back. Set your own value. See [webhooks.md](webhooks.md).
 
 `general.stale_days` is stored but not used yet. Stale-item triage is not
 implemented.

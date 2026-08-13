@@ -10,6 +10,7 @@ import (
 	"net/http/httptest"
 	"path/filepath"
 	"strconv"
+	"strings"
 	"testing"
 
 	"github.com/sirrobot01/snagarr/internal/config"
@@ -325,5 +326,59 @@ func TestWebhookAcceptsUnmatchedPayload(t *testing.T) {
 		map[string]any{"eventType": "Download", "movie": map[string]any{"tmdbId": 999999}})
 	if resp.StatusCode != http.StatusNoContent {
 		t.Errorf("unmatched webhook = %d, want 204", resp.StatusCode)
+	}
+}
+
+// The bookmarklet posts from whatever page the user is reading, so the browser
+// sends a preflight first. Without an answer to it, desktop capture cannot work.
+func TestCrossOriginPreflight(t *testing.T) {
+	h := newHarness(t)
+
+	req, err := http.NewRequest(http.MethodOptions, h.server.URL+"/api/v1/capture", nil)
+	if err != nil {
+		t.Fatalf("build request: %v", err)
+	}
+	req.Header.Set("Origin", "https://letterboxd.com")
+	req.Header.Set("Access-Control-Request-Method", "POST")
+	req.Header.Set("Access-Control-Request-Headers", "authorization,content-type")
+
+	resp, err := h.server.Client().Do(req)
+	if err != nil {
+		t.Fatalf("preflight: %v", err)
+	}
+	defer resp.Body.Close()
+
+	if resp.StatusCode != http.StatusNoContent {
+		t.Errorf("preflight status = %d, want 204", resp.StatusCode)
+	}
+	if got := resp.Header.Get("Access-Control-Allow-Origin"); got != "*" {
+		t.Errorf("Access-Control-Allow-Origin = %q, want *", got)
+	}
+	if got := resp.Header.Get("Access-Control-Allow-Headers"); !strings.Contains(strings.ToLower(got), "authorization") {
+		t.Errorf("Access-Control-Allow-Headers = %q, want it to include authorization", got)
+	}
+}
+
+// The operator has to paste this into Radarr and Tautulli, so it must be
+// readable rather than masked like a credential.
+func TestWebhookSecretIsReadable(t *testing.T) {
+	h := newHarness(t)
+
+	resp := h.do(t, http.MethodGet, "/api/v1/settings", h.adminToken, nil)
+	got := decodeBody[map[string]map[string]any](t, resp)
+	secret, _ := got["general"]["webhook_secret"].(string)
+
+	if secret == "" {
+		t.Fatal("no webhook secret in the settings response")
+	}
+	if config.IsMasked(secret) {
+		t.Errorf("webhook_secret = %q, want it readable so it can be configured", secret)
+	}
+
+	// It must be the value the webhook routes actually accept.
+	resp = h.do(t, http.MethodPost, "/api/v1/webhooks/radarr?secret="+secret, "",
+		map[string]any{"eventType": "Test"})
+	if resp.StatusCode != http.StatusNoContent {
+		t.Errorf("webhook with the reported secret = %d, want 204", resp.StatusCode)
 	}
 }

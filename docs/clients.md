@@ -151,9 +151,23 @@ Paste a link into the same box to capture a page.
 
 Press `/` anywhere to return to the search box.
 
-The **List** screen holds the filter chips and the poster grid. Select an item
-to open its detail sheet, with **Send to Radarr**, **Send to Sonarr**,
-**Request**, **Archive** and **Delete**.
+The **List** screen holds the poster grid. Filter it with the chips: **All**,
+**Ready**, **Pending**, **Reviewing** and **Archived**.
+
+Select an item to open its detail sheet. The sheet holds the actions:
+
+| Action | Who sees the button |
+|--------|---------------------|
+| **Send to Radarr** for a movie, **Send to Sonarr** for a series | Admin |
+| **Request via Overseerr** | Admin |
+| **Archive** or **Unarchive** | Everybody |
+| **Delete** | Admin |
+
+Snagarr picks the send target from the media type. There is one send button,
+not two.
+
+A member may archive only the items they captured. The API answers `403` for
+another member's item.
 
 ## Apple Shortcut
 

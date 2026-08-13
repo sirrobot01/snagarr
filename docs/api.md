@@ -74,7 +74,7 @@ interface Item {
   media_type: MediaType | "";
   title: string;               // the raw input until the item resolves
   year: number | null;
-  poster_path: string | null;  // TMDB path, e.g. "/abc.jpg". Prefix with image_base.
+  poster_path: string | null;  // TMDB path, e.g. "/abc.jpg". Prefix with https://image.tmdb.org/t/p/w185.
   status: Status;
   archived: boolean;
   raw_input: string;           // never discarded
@@ -277,12 +277,12 @@ value sent back unchanged in a `PUT` leaves the stored secret alone.
   "sonarr":  { "url": "…", "api_key": "••••", "quality_profile_id": 3,
                "root_folder": "/tv", "season_folder": true,
                "search_on_add": true, "configured": true },
-  "overseerr": { "url": "", "api_key": "", "prefer": false, "configured": false },
+  "overseerr": { "url": "", "api_key": "", "configured": false },
   "ntfy":    { "url": "https://ntfy.sh", "topic": "snagarr-home",
                "token": "", "priority": 3, "configured": true },
-  "telegram":{ "bot_token": "••••", "configured": true },
-  "general": { "reconcile_interval": "15m", "stale_days": 90,
-               "public_url": "http://localhost:8080", "image_base": "https://image.tmdb.org/t/p" }
+  "telegram":{ "bot_token": "••••", "configured": false },
+  "general": { "reconcile_interval": "15m0s", "public_url": "http://localhost:8080",
+               "webhook_secret": "3f8c1e…" }
 }
 ```
 
@@ -290,6 +290,13 @@ Every section carries two flags. `configured` reports whether the section holds
 enough to work. `locked` is true when an environment variable pins any value in
 that section; the UI then renders the whole card read-only, because a value
 edited there would be overwritten on the next restart.
+
+`general.webhook_secret` is **not** masked. The operator must paste it into
+Radarr and Tautulli, so a masked value would make the webhooks impossible to
+configure. Every other secret is masked.
+
+Durations round-trip in Go's format: `"15m"` is accepted and comes back as
+`"15m0s"`. An empty `library.section_ids` serialises as `null`, not `[]`.
 
 Locking is reported per section, not per field — an operator who pins one value
 of a service almost always pins the rest, and a half-editable card is worse than
@@ -361,10 +368,19 @@ Each endpoint takes `?secret=` matching the value shown in settings.
 
 | Endpoint | Sender | Effect |
 |----------|--------|--------|
-| `POST /webhooks/radarr` | Radarr | `Download`/`MovieFileImported` marks the item available, syncs the collection and notifies |
+| `POST /webhooks/radarr` | Radarr | marks the item available, syncs the collection and notifies |
 | `POST /webhooks/sonarr` | Sonarr | same for episodes |
-| `POST /webhooks/tautulli` | Tautulli | playback stop past the watched threshold marks the item watched |
-| `POST /webhooks/emby` | Emby or Jellyfin | playback stop marks the item watched |
+| `POST /webhooks/tautulli` | Tautulli | marks the item watched |
+| `POST /webhooks/emby` | Emby | marks the item watched |
+| `POST /webhooks/jellyfin` | Jellyfin | marks the item watched |
+
+The import webhooks act on four event types: `Download`, `MovieFileImported`,
+`EpisodeFileImported` and `Import`. Anything else is ignored.
+
+The playback webhooks act on **any** payload that carries a TMDB ID. Snagarr
+does not read the event name or a watched percentage, so the sender decides
+when a title counts as watched. Trigger the webhook on playback stop, not on
+playback start.
 
 All return `204 No Content`, including for payloads that match nothing — a
 webhook must never make the sender retry.

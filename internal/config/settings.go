@@ -59,7 +59,6 @@ type ArrSettings struct {
 type OverseerrSettings struct {
 	URL    string `json:"url"`
 	APIKey string `json:"api_key"`
-	Prefer bool   `json:"prefer"`
 }
 
 type NtfySettings struct {
@@ -75,10 +74,11 @@ type TelegramSettings struct {
 
 type GeneralSettings struct {
 	ReconcileInterval Duration `json:"reconcile_interval"`
-	StaleDays         int      `json:"stale_days"`
 	PublicURL         string   `json:"public_url"`
-	ImageBase         string   `json:"image_base"`
-	WebhookSecret     string   `json:"webhook_secret"`
+
+	// WebhookSecret authenticates the inbound webhook routes. It is readable
+	// on purpose: the operator has to paste it into Radarr and Tautulli.
+	WebhookSecret string `json:"webhook_secret"`
 }
 
 type Settings struct {
@@ -107,11 +107,7 @@ func defaults() Settings {
 		Radarr:  ArrSettings{SearchOnAdd: true},
 		Sonarr:  ArrSettings{SearchOnAdd: true, SeasonFolder: true},
 		Ntfy:    NtfySettings{URL: "https://ntfy.sh", Priority: 3},
-		General: GeneralSettings{
-			ReconcileInterval: Duration(15 * time.Minute),
-			StaleDays:         90,
-			ImageBase:         "https://image.tmdb.org/t/p",
-		},
+		General: GeneralSettings{ReconcileInterval: Duration(15 * time.Minute)},
 	}
 }
 
@@ -119,14 +115,13 @@ func defaults() Settings {
 // masking, restoring and env overlays all work from one list.
 func (s *Settings) secretFields() map[string]*string {
 	return map[string]*string{
-		"tmdb.api_key":           &s.TMDB.APIKey,
-		"library.token":          &s.Library.Token,
-		"radarr.api_key":         &s.Radarr.APIKey,
-		"sonarr.api_key":         &s.Sonarr.APIKey,
-		"overseerr.api_key":      &s.Overseerr.APIKey,
-		"ntfy.token":             &s.Ntfy.Token,
-		"telegram.bot_token":     &s.Telegram.BotToken,
-		"general.webhook_secret": &s.General.WebhookSecret,
+		"tmdb.api_key":       &s.TMDB.APIKey,
+		"library.token":      &s.Library.Token,
+		"radarr.api_key":     &s.Radarr.APIKey,
+		"sonarr.api_key":     &s.Sonarr.APIKey,
+		"overseerr.api_key":  &s.Overseerr.APIKey,
+		"ntfy.token":         &s.Ntfy.Token,
+		"telegram.bot_token": &s.Telegram.BotToken,
 	}
 }
 

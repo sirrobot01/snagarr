@@ -58,3 +58,21 @@ func (s *Server) verifyWebhookSecret(r *http.Request) bool {
 	got := r.URL.Query().Get("secret")
 	return want != "" && subtle.ConstantTimeCompare([]byte(want), []byte(got)) == 1
 }
+
+// allowCrossOrigin lets the bookmarklet and other page-embedded clients reach
+// the API from any origin. A wildcard is safe here because authentication is a
+// bearer token: there are no cookies for a hostile page to ride on, and it must
+// already hold a token to get anything back.
+func allowCrossOrigin(next http.Handler) http.Handler {
+	return http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		w.Header().Set("Access-Control-Allow-Origin", "*")
+		w.Header().Set("Access-Control-Allow-Methods", "GET, POST, PUT, PATCH, DELETE, OPTIONS")
+		w.Header().Set("Access-Control-Allow-Headers", "Authorization, Content-Type")
+		w.Header().Set("Access-Control-Max-Age", "86400")
+		if r.Method == http.MethodOptions {
+			w.WriteHeader(http.StatusNoContent)
+			return
+		}
+		next.ServeHTTP(w, r)
+	})
+}

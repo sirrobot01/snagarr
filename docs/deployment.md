@@ -127,7 +127,8 @@ Builds exist for Linux, macOS, Windows and FreeBSD, on `amd64`, `arm64` and
 
 1. Download the archive for your platform from the
    [releases page](https://github.com/sirrobot01/snagarr/releases). The name is
-   `snagarr_<version>_<os>_<arch>.tar.gz`.
+   `snagarr_<version>_<os>_<arch>.tar.gz`. Windows archives use `.zip`. The
+   `arm` builds add the version, for example `snagarr_0.1.0_linux_armv7.tar.gz`.
 2. Download `snagarr_<version>_checksums.txt`.
 3. Check the archive: `sha256sum --check --ignore-missing snagarr_<version>_checksums.txt`.
 4. Unpack it: `tar xzf snagarr_<version>_linux_amd64.tar.gz`.
