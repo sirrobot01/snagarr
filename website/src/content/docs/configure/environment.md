@@ -1,9 +1,15 @@
 ---
 title: Environment variables
-description: Every SNAGARR_ variable, the start-up options it covers and the setting it overrides.
+description: Every SNAGARR_ variable — the start-up options, the settings it overrides and the first admin's services it seeds.
 ---
 
-Snagarr reads two kinds of variable. Start-up options are read once, before the database opens; a change needs a restart. Every other variable overrides a stored setting at start-up and after every save.
+Snagarr reads three kinds of variable.
+
+| Kind | Applied | Change needs |
+|------|---------|--------------|
+| Start-up option | Once, before the database opens | A restart |
+| Setting override | At start-up and after every save | A restart |
+| Service seed | At start-up | A restart |
 
 No `SNAGARR_*` variable outside these tables exists.
 
@@ -28,34 +34,55 @@ The container image sets `SNAGARR_DATA_DIR=/data`.
 | Variable | Overrides | Type |
 |----------|-----------|------|
 | `SNAGARR_TMDB_API_KEY` | `tmdb.api_key` | string |
-| `SNAGARR_LIBRARY_PROVIDER` | `library.provider` | string |
-| `SNAGARR_LIBRARY_URL` | `library.url` | string |
-| `SNAGARR_LIBRARY_TOKEN` | `library.token` | string |
-| `SNAGARR_LIBRARY_COLLECTION` | `library.collection_name` | string |
-| `SNAGARR_RADARR_URL` | `radarr.url` | string |
-| `SNAGARR_RADARR_API_KEY` | `radarr.api_key` | string |
-| `SNAGARR_RADARR_QUALITY_PROFILE_ID` | `radarr.quality_profile_id` | integer |
-| `SNAGARR_RADARR_ROOT_FOLDER` | `radarr.root_folder` | string |
-| `SNAGARR_SONARR_URL` | `sonarr.url` | string |
-| `SNAGARR_SONARR_API_KEY` | `sonarr.api_key` | string |
-| `SNAGARR_SONARR_QUALITY_PROFILE_ID` | `sonarr.quality_profile_id` | integer |
-| `SNAGARR_SONARR_ROOT_FOLDER` | `sonarr.root_folder` | string |
-| `SNAGARR_OVERSEERR_URL` | `overseerr.url` | string |
-| `SNAGARR_OVERSEERR_API_KEY` | `overseerr.api_key` | string |
-| `SNAGARR_NTFY_URL` | `ntfy.url` | string |
-| `SNAGARR_NTFY_TOPIC` | `ntfy.topic` | string |
-| `SNAGARR_NTFY_TOKEN` | `ntfy.token` | string |
-| `SNAGARR_TELEGRAM_BOT_TOKEN` | `telegram.bot_token` | string |
 | `SNAGARR_PUBLIC_URL` | `general.public_url` | string |
 | `SNAGARR_SHORTCUT_URL` | `general.shortcut_url` | string |
 | `SNAGARR_RECONCILE_INTERVAL` | `general.reconcile_interval` | Go duration |
 
-## Rules
+These four are the whole list. Settings hold nothing else now: every other integration is a [service](/snagarr/configure/services/).
 
-- An empty variable is ignored. So is a number or a duration that does not parse.
+`general.webhook_secret` has no variable.
+
+## Service seeding
+
+The variables below do not override a setting. They write **the first admin's** services, so a Docker-first operator never has to open the UI.
+
+| Variable | Kind | Config field | Type |
+|----------|------|--------------|------|
+| `SNAGARR_LIBRARY_PROVIDER` | — | Picks the kind: `plex`, `emby` or `jellyfin` | string |
+| `SNAGARR_LIBRARY_URL` | media server | `url` | string |
+| `SNAGARR_LIBRARY_TOKEN` | media server | `token` | string |
+| `SNAGARR_LIBRARY_COLLECTION` | media server | `collection_name` | string |
+| `SNAGARR_RADARR_URL` | `radarr` | `url` | string |
+| `SNAGARR_RADARR_API_KEY` | `radarr` | `api_key` | string |
+| `SNAGARR_RADARR_QUALITY_PROFILE_ID` | `radarr` | `quality_profile_id` | integer |
+| `SNAGARR_RADARR_ROOT_FOLDER` | `radarr` | `root_folder` | string |
+| `SNAGARR_SONARR_URL` | `sonarr` | `url` | string |
+| `SNAGARR_SONARR_API_KEY` | `sonarr` | `api_key` | string |
+| `SNAGARR_SONARR_QUALITY_PROFILE_ID` | `sonarr` | `quality_profile_id` | integer |
+| `SNAGARR_SONARR_ROOT_FOLDER` | `sonarr` | `root_folder` | string |
+| `SNAGARR_OVERSEERR_URL` | `overseerr` | `url` | string |
+| `SNAGARR_OVERSEERR_API_KEY` | `overseerr` | `api_key` | string |
+| `SNAGARR_NTFY_URL` | `ntfy` | `url` | string |
+| `SNAGARR_NTFY_TOPIC` | `ntfy` | `topic` | string |
+| `SNAGARR_NTFY_TOKEN` | `ntfy` | `token` | string |
+
+### Rules
+
+- Each seeded service is owned by the first admin and named `Default`.
+- Seeding runs on every start. It rewrites the config of the service it owns.
+- A seeded service comes back with `"locked": true`. The UI renders its fields read-only.
+- Snagarr skips a kind the environment says nothing about. A service you made in the UI is left alone.
+- `SNAGARR_LIBRARY_PROVIDER` must be `plex`, `emby` or `jellyfin`. Any other value seeds no media server.
+- Seeding needs an admin to own the services. Until one exists, seeding does nothing.
+- Another member's service is never touched, whatever the variables say.
+
+`section_ids`, `search_on_add`, `season_folder` and `priority` have no variable. Set them in the UI or with `PATCH /api/v1/services/{id}`.
+
+## Rules for every variable
+
+- An empty variable is ignored. So is an integer or a duration that does not parse.
 - A `PUT /api/v1/settings` still writes your value to the database. The environment value goes back on top until you remove the variable.
-- An override locks the whole settings card in the UI, not the single field. `SNAGARR_RADARR_URL` alone makes the Radarr card read-only.
-- These settings have no variable: `library.section_ids`, `radarr.search_on_add`, `sonarr.search_on_add`, `sonarr.season_folder`, `radarr.season_folder`, `ntfy.priority`, `general.webhook_secret`.
+- A settings override locks the whole settings card in the UI, not the single field. A service seed locks that one service record.
 
 ## Example
 
@@ -78,3 +105,5 @@ services:
 volumes:
   snagarr:
 ```
+
+That file gives the first admin a Plex service called `Default`. Every other member connects their own.

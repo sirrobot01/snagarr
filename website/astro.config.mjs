@@ -42,6 +42,7 @@ export default defineConfig({
 				{
 					label: 'Configure',
 					items: [
+						{ label: 'Services', slug: 'configure/services' },
 						{ label: 'Settings', slug: 'configure/settings' },
 						{ label: 'Environment variables', slug: 'configure/environment' },
 						{ label: 'Media servers', slug: 'configure/media-servers' },

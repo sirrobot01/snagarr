@@ -9,8 +9,8 @@ Snagarr acts on two kinds of event:
 
 | Kind | Sender | Effect |
 |------|--------|--------|
-| Import | Radarr, Sonarr | Marks the item `available`, sends the ntfy push, adds the title to the collection |
-| Playback | Tautulli, Emby, Jellyfin | Marks the item `watched`, removes the title from the collection |
+| Import | Radarr, Sonarr | Marks the item `available`, sends the ntfy push, adds the title to every collection whose server holds it |
+| Playback | Tautulli, Emby, Jellyfin | Marks the item `watched`, removes the title from the collections |
 
 ## URL
 
@@ -44,7 +44,9 @@ Snagarr answers `204` for a payload it cannot use, so a sender never retries.
 
 ## The secret
 
-Snagarr generates 32 hexadecimal characters on first start and stores them as `general.webhook_secret`. It returns in clear text, unlike every other secret. It has no `SNAGARR_*` override. The settings UI has no General card, so read it from the API:
+Snagarr generates 32 hexadecimal characters on first start and stores them as `general.webhook_secret`. It returns in clear text, unlike every other secret. It has no `SNAGARR_*` override.
+
+Read it in **Settings → General**, which also prints the finished webhook URL beside it. Or read it from the API:
 
 ```sh
 curl -s http://localhost:8080/api/v1/settings \
@@ -181,15 +183,15 @@ Import:
 1. Find the snagged item with that TMDB ID and media type. No match, no effect.
 2. Already `available` or `watched`, no effect.
 3. Otherwise set the item to `available` and stamp `available_at`.
-4. Send one ntfy push, if ntfy is configured. Never a second push for the same item.
-5. Start a reconcile pass, which adds the title to the collection.
+4. Send one ntfy push to the capturer's topic, or to an admin's when the capturer has none. Never a second push for the same item.
+5. Start a reconcile pass, which adds the title to every collection whose server holds it.
 
 Playback:
 
 1. Find the snagged item with that TMDB ID and media type. No match, no effect.
 2. Record a watch event with the sender name as the source.
 3. Set the item to `watched`.
-4. Start a reconcile pass, which removes the title from the collection.
+4. Start a reconcile pass, which removes the title from every collection.
 
 ## Test
 

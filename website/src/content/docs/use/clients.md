@@ -1,6 +1,6 @@
 ---
 title: Capture clients
-description: Every client posts to /api/v1/capture — the web app, an Apple Shortcut, a bookmarklet or curl.
+description: Every client posts to /api/v1/capture — the web app, the published Apple Shortcut, a bookmarklet or curl.
 ---
 
 Every client is a front-end over one endpoint: `POST /api/v1/capture`. Each one authenticates with its own bearer token. See [First run](/snagarr/start/first-run/#tokens) to issue one.
@@ -8,10 +8,10 @@ Every client is a front-end over one endpoint: `POST /api/v1/capture`. Each one 
 | Client | State | Runs on |
 |--------|-------|---------|
 | Web app | Works | Any browser |
-| Apple Shortcut | Import from the operator's iCloud link | iOS, iPadOS, macOS |
+| Apple Shortcut | Install Snagarr's published link | iOS, iPadOS, macOS, watchOS |
 | Bookmarklet | Works from any origin | Desktop browser |
 | `curl` and scripts | Works | Anywhere |
-| Telegram bot | Not implemented | — |
+| Telegram bot | Dropped | — |
 | Command line | Not implemented | — |
 
 ## The capture request
@@ -28,7 +28,7 @@ Content-Type: application/json
 | `url` | string | A link. Used when `query` is empty |
 | `tmdb_id` | number | An exact TMDB ID. Needs `media_type` |
 | `media_type` | string | `movie` or `tv`. Only with `tmdb_id` |
-| `source` | string | `web`, `shortcut`, `telegram`, `bookmarklet`, `api` or `cli`. Defaults to `api` |
+| `source` | string | `web`, `shortcut`, `bookmarklet`, `api` or `cli`. Defaults to `api` |
 | `note` | string | Free text kept with the item |
 | `source_url` | string | The page the capture came from |
 
@@ -64,25 +64,71 @@ The **List** screen holds the poster grid, filtered by the chips **All**, **Read
 | **Archive** or **Unarchive** | Everybody, own items only for a member |
 | **Delete** | Admin |
 
+The API is wider than the buttons. `POST /api/v1/items/{id}/send` accepts any token and spends the caller's own service, and `DELETE /api/v1/items/{id}` accepts the capturer. A member uses `curl` for both today.
+
 ## Apple Shortcut
 
-Snagarr does not generate a shortcut file. The operator builds one shortcut, shares it as an iCloud link, and stores that link in `general.shortcut_url`. Everybody in the household imports from the same link.
+Snagarr publishes one Shortcut, named **Snag**. Apple signs it, so it imports with no untrusted-shortcut prompt.
 
-### Why an iCloud link
+```
+https://www.icloud.com/shortcuts/c4b4dabe0b55481c9fe35fac0a4a266b
+```
 
-An unsigned `.shortcut` file makes iOS demand **Settings → Shortcuts → Allow Untrusted Shortcuts**. That toggle stays hidden until the device has run a shortcut once. Signing a file needs macOS, which a Linux container does not have.
+That link is the default value of `general.shortcut_url`. A fresh install needs no configuration: the **Install the iOS Shortcut** button on the Snag screen already opens it.
 
-Apple signs every shortcut shared as an iCloud link. It imports with no prompt.
+### Install it
 
-An iCloud link is public, so it cannot carry a token. The shortcut asks for the server URL and the token as **import questions** instead. Two prompts, once, at import time.
+1. Get a token. An admin issues one under **Settings → Household & tokens**, or with `POST /api/v1/users/{id}/tokens`.
+2. Open the link on the device. The **Install the iOS Shortcut** button opens the same link.
+3. Tap **Get Shortcut**.
+4. Answer `What is your Snagarr address?`.
+5. Answer `Paste your Snagarr token`.
 
-### Build the shortcut
+:::caution[Give it the address your phone can reach]
+`http://localhost:8080` works only on the machine running Snagarr. Enter the address the household actually reaches, for example `https://snagarr.example.com`. Set `general.public_url` to the same value.
+:::
 
-Add the actions first. An import question binds to a field inside an existing action. An empty shortcut answers `This shortcut has no actions. Please add some actions to your shortcut before setting up Import Questions.`
+Give each member their own token. Every capture records the member behind the token. See [First run](/snagarr/start/first-run/#tokens).
+
+### What it sends
+
+```
+POST <your address>/api/v1/capture
+Authorization: Bearer <your token>
+Content-Type: application/json
+
+{"query": "<Shortcut Input>", "source": "shortcut"}
+```
+
+It then reads `title` from the response and shows a notification, `Snagged <title>`.
+
+Run it from the share sheet, from selected text, from the home screen or from an Apple Watch. It accepts URLs, text, rich text, articles and Safari web pages.
+
+Send everything as `query`. Snagarr treats a value that starts with `http://` or `https://` as a link and runs it through the same resolver. The shortcut needs no branch on the input.
+
+The response is `202 Accepted`. The item can sit in **Needs Review** for a moment while it resolves, and the notification then names the raw input rather than a title.
+
+| Symptom | Cause |
+|---------|-------|
+| `401 unauthorized` | The token is wrong or revoked |
+| `404`, or nothing arrives | The address answer is wrong, or it ends in `/` |
+| Nothing arrives, no error | The address is not reachable from the phone |
+
+### Publish your own
+
+Skip this unless you want a different Shortcut. Snagarr generates no shortcut file; you build one and publish it yourself.
+
+:::danger[Sharing publishes whatever the Text actions hold]
+An iCloud link carries the current contents of the shortcut. A real token typed into a Text action goes out with the link, to everybody who has it.
+
+Share while both Text actions hold placeholders. Put your real values back only afterwards, in your own copy. An import question does **not** clear the field for you.
+:::
+
+An iCloud link is public, so it cannot carry a token. Import questions collect the address and the token from each person at import time.
 
 1. Open the **Shortcuts** app on a Mac. Click **+**. Name the shortcut `Snag`.
-2. Add a **Text** action. Set its content to `https://snagarr.example.com`. The URL question targets this field.
-3. Add a second **Text** action. Set its content to `sngr_your_token`. The token question targets this field.
+2. Add a **Text** action. Set its content to `http://localhost:8080`.
+3. Add a second **Text** action. Set its content to `sngr_replace_me`.
 4. Add **Get Contents of URL**. Click **Show More**. Fill it in from this table.
 
 | Field | Value |
@@ -95,53 +141,26 @@ Add the actions first. An import question binds to a field inside an existing ac
 | JSON field `query` | The **Shortcut Input** variable |
 | JSON field `source` | `shortcut` |
 
-The request it sends:
+5. Add **Get Dictionary Value**. Set **Key** to `title`.
+6. Add **Show Notification**. Set its text to the **Dictionary Value** variable.
+7. Test it: type your real address and token into the two **Text** actions, run the shortcut once, and fix any failure.
+8. **Put the placeholders back into both Text actions.** Everything below publishes what they hold.
+9. Click the details icon in the toolbar. Click **Setup**.
 
-```
-POST https://snagarr.example.com/api/v1/capture
-Authorization: Bearer sngr_your_token
-Content-Type: application/json
+   Add the actions before this step. An import question binds to a field inside an existing action. An empty shortcut answers `This shortcut has no actions. Please add some actions to your shortcut before setting up Import Questions.`
 
-{"query": "<Shortcut Input>", "source": "shortcut"}
-```
+10. Click **+**. Choose the **Text** action from step 2. Type `What is your Snagarr address?` in **Question Text**.
+11. Click **+**. Choose the **Text** action from step 3. Type `Paste your Snagarr token` in **Question Text**.
+12. Click **Done**.
+13. Click **Details**. Select **Show in Share Sheet**. A **Receive** action appears at the top of the shortcut.
+14. Click **Any** in that **Receive** action. Limit the input types to **URLs** and **Text**.
+15. Click the share button. Choose **Copy iCloud Link**.
+16. Paste the link into Snagarr under **Settings → General → iOS Shortcut link**, or set `SNAGARR_SHORTCUT_URL`.
+17. Type your real address and token back into your own copy.
 
-5. Add **Show Notification**. Set its text to the **Contents of URL** variable.
-6. Run the shortcut once. Both **Text** actions still hold real values, so this proves the request works. Fix any failure before you share the link.
-7. Click the details icon in the toolbar. Click **Setup**.
-8. Click **+**. Choose the **Text** action from step 2. Type `What is your Snagarr URL?` in **Question Text**.
-9. Click **+**. Choose the **Text** action from step 3. Type `What is your Snagarr token?` in **Question Text**.
-10. Click **Done**.
-11. Click **Details**. Select **Show in Share Sheet**. A **Receive** action appears at the top of the shortcut.
-12. Click **Any** in that **Receive** action. Limit the input types to **URLs** and **Text**.
-13. Click the share button. Choose **Copy iCloud Link**.
-14. Paste the link into Snagarr under **Settings → General → iOS Shortcut link**.
-
-Leave the real values in the two **Text** actions. Sharing the link clears both fields, because an import question is set on each.
-
-### Import the shortcut
-
-The Snag screen shows an **Install the iOS Shortcut** button once `general.shortcut_url` is set. The button stays hidden while the setting is empty.
-
-1. Tap the link.
-2. Tap **Get Shortcut**.
-3. Answer `What is your Snagarr URL?`.
-4. Answer `What is your Snagarr token?`.
-
-Give each member their own token. Every capture records the member behind the token. See [First run](/snagarr/start/first-run/#tokens).
-
-### Run it
-
-Run it from the share sheet, from selected text, or from the home screen.
-
-Send everything as `query`. Snagarr treats a value that starts with `http://` or `https://` as a link and runs it through the same resolver. The shortcut needs no branch on the input.
-
-The response is `202 Accepted`. The item can sit in **Needs Review** for a moment while it resolves.
-
-| Symptom | Cause |
-|---------|-------|
-| `401 unauthorized` | The header value lost its `Bearer ` prefix, or the token is revoked |
-| `400 bad_request` | **Request Body** is not `JSON` |
-| `404`, or nothing arrives | The URL answer is wrong, or it ends in `/` |
+:::caution[Publish a reachable address]
+Whatever you put in the URL **Text** action is the default every importer sees. A shortcut published with `localhost` is useless to anybody else. Publish the address the household actually reaches.
+:::
 
 ## Bookmarklet
 
@@ -194,11 +213,13 @@ curl -G http://localhost:8080/api/v1/search \
 curl -G http://localhost:8080/api/v1/items \
   -H "Authorization: Bearer $SNAG_TOKEN" --data-urlencode "status=needs_review"
 
-# send to Radarr (admin token)
+# send to your own Radarr
 curl -X POST http://localhost:8080/api/v1/items/42/send \
   -H "Authorization: Bearer $SNAG_TOKEN" -H "Content-Type: application/json" \
   -d '{"target":"radarr"}'
 ```
+
+The send spends a Radarr **you** own. With none, it answers `503 not_configured`. See [Services](/snagarr/configure/services/).
 
 ## Posters
 

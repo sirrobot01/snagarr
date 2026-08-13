@@ -10,18 +10,21 @@ Set `SNAGARR_LOG_LEVEL=debug` and restart before you investigate anything. Debug
 | Symptom | Cause | Fix |
 |---------|-------|-----|
 | Captures stay `needs_review` forever | No TMDB key | Set `tmdb.api_key` |
-| API answers `503 not_configured` | The section for that call is empty | Check `configured` in `GET /api/v1/settings` |
-| API answers `403 forbidden` | A `member` token on an admin route | Use an admin token |
+| A send answers `503 not_configured` | You own no service of that kind | Add one under **Settings → My services** |
+| API answers `403 forbidden` | A `member` token on an admin route, or another member's service | Use an admin token |
 | API answers `400 bad_request` | An unknown field in the body | Send only the documented fields |
+| `POST /api/v1/services` answers `409 conflict` | You already own that kind under that name | Give it a different name |
 | A settings card is read-only | An environment variable pins a value in that section | Remove the variable and restart |
+| A service card is read-only | An environment variable seeds that record on every start | Remove the variable and restart |
 | A saved value reverts after a restart | The same environment override | Remove the variable |
 | The UI returns 404, the API works | The binary was built without `internal/web/dist` | Run `task build`, not `go build` |
 | The browser blocks every API call | Duplicate CORS headers at the proxy | Remove the CORS headers from the proxy |
 | The app breaks under `/snagarr/` | The client calls `/api/v1` from the domain root | Serve Snagarr on its own host |
 | `permission denied` on the data directory | The image runs as UID 65532 | `sudo chown -R 65532:65532 ./data` |
 | A Sonarr send fails | Sonarr keys on TVDB, which Snagarr reads from TMDB | Set `tmdb.api_key` |
-| No ntfy push | `ntfy.topic` is empty, or the item already sent one | One push per item, ever |
-| The collection stays empty | `library.collection_name` is empty, or the library is unconfigured | Set both |
+| No ntfy push | The capturer owns no ntfy and no admin does either, or the item already sent one | One push per item, ever |
+| The collection stays empty | That service's `collection_name` is empty, or the server holds none of the titles | Set the name; a collection only names titles that server has |
+| A title reads `IN LIBRARY` but is not in your library | Another member's server holds it | State is the household union |
 
 ## A webhook does nothing
 
@@ -68,7 +71,7 @@ A deleted title survives in the index until the next full media server sweep, wh
 
 ## A connection test fails
 
-`POST /api/v1/settings/test` shows the upstream message unchanged.
+`POST /api/v1/services/{id}/test` shows the upstream message unchanged. `POST /api/v1/settings/test` does the same for TMDB, and accepts no other name.
 
 | Message | Cause |
 |---------|-------|
@@ -76,7 +79,19 @@ A deleted title survives in the index until the next full media server sweep, wh
 | A connection error | Wrong URL, wrong port, or no route from the container |
 | `404` | A URL with a trailing path, or the wrong service on that port |
 
+The test reads the **stored** record. Save the card before you test it; the UI does that for you.
+
 Use the address the Snagarr container can reach, not the one your browser uses. `http://localhost:7878` inside a container is the container itself.
+
+## A send goes to the wrong server
+
+Sending is personal. Snagarr uses the service the **caller** owns.
+
+1. Read your own stack: `GET /api/v1/services`.
+2. An admin reads a member's stack: `GET /api/v1/users/{id}/services`.
+3. Check `enabled` and the config on the row you expected.
+
+A member never falls through to an admin's service. An admin falls through to their own, then the capturer's, then another admin's.
 
 ## A lost token
 
@@ -87,7 +102,7 @@ Snagarr stores only the SHA-256 digest of a token, so a lost value cannot be rec
 
 ## A lost `secret.key`
 
-Every stored setting is encrypted with `<data dir>/secret.key`. Without that file, no credential can be read. Set every integration again, or restore the key from a backup. Items, users and tokens are not encrypted and survive.
+Every stored setting and every service config is encrypted with `<data dir>/secret.key`. Without that file, no credential can be read. Set every service again, or restore the key from a backup. Items, users and tokens are not encrypted and survive.
 
 ## A settings value will not stay
 

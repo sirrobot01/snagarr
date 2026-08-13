@@ -41,7 +41,9 @@ The image runs as `nonroot`, UID 65532. A bind mount must be writable by that UI
       SNAGARR_RADARR_API_KEY: your_radarr_key
 ```
 
-Each variable locks its card in the settings UI. See [Environment variables](/snagarr/configure/environment/).
+`SNAGARR_TMDB_API_KEY` pins a setting and locks the TMDB card. `SNAGARR_RADARR_*` writes a Radarr [service](/snagarr/configure/services/) owned by the **first admin**, named `Default`, rewritten on every start and rendered read-only.
+
+Every other member connects their own services in the UI. No variable touches them. See [Environment variables](/snagarr/configure/environment/).
 
 ## Plain Docker
 
@@ -135,9 +137,9 @@ WantedBy=multi-user.target
 
 | File | Contents |
 |------|----------|
-| `snagarr.db` | Items, users, tokens, indexes and settings |
+| `snagarr.db` | Items, users, tokens, services, indexes and settings |
 | `snagarr.db-wal`, `snagarr.db-shm` | SQLite write-ahead log |
-| `secret.key` | The 32-byte key that encrypts the stored settings, mode `0600` |
+| `secret.key` | The 32-byte key that encrypts the stored settings and service configs, mode `0600` |
 
 Mount one volume at the data directory. The default is `data` beside the working directory; the image sets `/data`.
 
@@ -201,7 +203,7 @@ curl http://localhost:8080/api/v1/health
 
 ## Backup
 
-Back up `snagarr.db` and `secret.key` together. Snagarr cannot read a stored setting without `secret.key`: a database restored beside a new key loses every API key and every server token.
+Back up `snagarr.db` and `secret.key` together. Snagarr cannot read a stored setting or service config without `secret.key`: a database restored beside a new key loses every API key and every server token.
 
 The database uses write-ahead logging, so a live copy of `snagarr.db` alone can be incomplete. Stop the process first.
 

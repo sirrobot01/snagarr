@@ -1,52 +1,55 @@
 ---
 title: Notifications
-description: Configure ntfy pushes for titles that become available, plus the state of the Telegram fields.
+description: Connect an ntfy topic as your own service and get one push when a snagged title becomes available.
 ---
 
-## ntfy
+ntfy is a [service](/snagarr/configure/services/). Every member connects their own topic. Snagarr sends one push when a snagged title becomes available, and never a second push for the same item.
 
-Optional. Snagarr sends one push when a snagged title becomes available, and never a second push for the same item.
+## Config fields
 
 | Field | Type | Default | Variable |
 |-------|------|---------|----------|
-| `ntfy.url` | string | `https://ntfy.sh` | `SNAGARR_NTFY_URL` |
-| `ntfy.topic` | string | *(empty)* | `SNAGARR_NTFY_TOPIC` |
-| `ntfy.token` | string | *(empty)* | `SNAGARR_NTFY_TOKEN` |
-| `ntfy.priority` | integer | `3` | *(none)* |
+| `url` | string | `https://ntfy.sh` | `SNAGARR_NTFY_URL` |
+| `topic` | string | *(empty)* | `SNAGARR_NTFY_TOPIC` |
+| `token` | string | *(empty)* | `SNAGARR_NTFY_TOKEN` |
+| `priority` | integer | `3` | *(none)* |
 
-Configured when the topic is set.
+Configured when the topic is set. An ntfy server needs no credential, so the topic is the whole requirement.
 
-Set `ntfy.token` for a server that needs authentication. Leave it empty for an open server.
+Set `token` for a server that needs authentication. Leave it empty for an open server.
 
-`ntfy.priority` must be 1 to 5. Any other value makes Snagarr leave the header out, so the ntfy server default applies.
+`priority` must be 1 to 5. Any other value makes Snagarr leave the header out, so the ntfy server default applies. The card offers **Send at high priority**, which writes `4`. Set any other value with the API.
 
-The push carries the capture context:
+## Add one
 
-```
-Sinners is ready — snagged by Amina, 12 Jul, from telegram
-```
-
-It carries a click link when `general.public_url` is set.
-
-Two events send a push: a Radarr or Sonarr import webhook, and a reconcile pass that finds an item became available.
-
-`ntfy.token` and `ntfy.priority` have no card in the settings UI. Set them through the API:
+1. Open **Settings**.
+2. Choose `ntfy` under **Add service**. Select **Add**.
+3. Fill in the topic.
+4. Select **Test connection**. Snagarr calls `/v1/health` on the server.
 
 ```sh
-curl -X PUT http://localhost:8080/api/v1/settings \
-  -H "Authorization: Bearer sngr_your_admin_token" \
+curl -X POST http://localhost:8080/api/v1/services \
+  -H "Authorization: Bearer sngr_your_token" \
   -H "Content-Type: application/json" \
-  -d '{"ntfy":{"url":"https://ntfy.example.com","topic":"snagarr-home","priority":4}}'
+  -d '{"kind":"ntfy","config":{"url":"https://ntfy.example.com","topic":"snagarr-amina","priority":4}}'
 ```
 
-## Telegram
+The environment variables seed the first admin's topic only. See [Environment variables](/snagarr/configure/environment/#service-seeding).
 
-| Field | Type | Default | Variable |
-|-------|------|---------|----------|
-| `telegram.bot_token` | string | *(empty)* | `SNAGARR_TELEGRAM_BOT_TOKEN` |
+## Who gets the push
 
-The Telegram bot is not implemented. Nothing reads this field. Snagarr runs no bot, polls nothing and answers no message. User records accept a `telegram_user_id` that nothing reads either.
+The push goes to the **capturer's** own ntfy. When the capturer has none, it goes to an admin's, because an unowned push still has to reach somebody.
 
-`GET /api/v1/settings` still reports the section as configured when a bot token is stored, and the **Telegram** row on the setup screen turns green. That state means only that the value is saved. `GET /api/v1/status` does not list Telegram.
+Connect your own topic to be told about the titles you snagged.
 
-There is no connection test for Telegram.
+## The push
+
+It carries the capture context:
+
+```
+Sinners is ready — snagged by Amina, 12 Jul, from shortcut
+```
+
+The title is `Ready to watch`. It carries a click link when `general.public_url` is set.
+
+Two events send a push: a Radarr or Sonarr import webhook, and a reconcile pass that finds an item became available.

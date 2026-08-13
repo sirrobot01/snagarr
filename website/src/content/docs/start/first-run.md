@@ -37,16 +37,22 @@ To change the token later, open `<public url>/#token=<new token>`.
 
 ## Setup wizard
 
-Open `/setup` for the four-step wizard. Every step can be skipped and set later in Settings.
+Open `/setup` for the four-step wizard. Every step can be skipped and done later in Settings.
 
-| Step | Field | Required |
-|------|-------|----------|
-| 1 | TMDB API key (v3) from [themoviedb.org](https://www.themoviedb.org/settings/api) | Yes. Without it, captures save but never resolve. |
-| 2 | Media server: Plex, Emby or Jellyfin | No. Gives the library badges and the `Snagged` collection. |
-| 3 | Radarr and Sonarr URL plus API key | No. Needed to send titles. |
-| 4 | ntfy topic | No. Sends the push when a title becomes available. |
+| Step | What you do | Required |
+|------|-------------|----------|
+| 1 | Paste a TMDB API key (v3) from [themoviedb.org](https://www.themoviedb.org/settings/api) | Yes. Without it, captures save but never resolve. |
+| 2 | Add a media server: Plex, Emby or Jellyfin | No. Gives the library badges and the `Snagged` collection. |
+| 3 | Add Radarr and Sonarr | No. Needed to send titles. |
+| 4 | Take a household token | No. |
 
-Each card has a **Test** button. It calls `POST /api/v1/settings/test` and shows the upstream message unchanged, for example `OK · 611 items` or `401 — check token`.
+Step 1 writes a setting. Steps 2 and 3 create [services](/snagarr/configure/services/) you own. A service must exist before it can be tested, so each card saves itself.
+
+Each card has a **Test connection** button. It shows the upstream message unchanged, for example `OK · 611 items` or `401 — check token`.
+
+Step 4 lists what the household as a whole can reach. It reads `GET /api/v1/status`, so a service another member connected also counts.
+
+ntfy is not a wizard step. Add it in Settings. See [Notifications](/snagarr/configure/notifications/).
 
 ## Household members
 
@@ -59,7 +65,15 @@ curl -X POST http://localhost:8080/api/v1/users \
   -d '{"display_name":"Amina","role":"member"}'
 ```
 
-Roles are `admin` and `member`. See the role table in the [Introduction](/snagarr/#roles). The last admin cannot be deleted or demoted; the API answers `409 conflict`. Deleting a user keeps their items and nulls the attribution.
+Roles are `admin` and `member`. See the role table in the [Introduction](/snagarr/#roles). The last admin cannot be deleted or demoted; the API answers `409 conflict`. Deleting a user keeps their items and nulls the attribution, and removes their services with every index row those services own.
+
+Every member connects their own Radarr, Sonarr, Overseerr, media server and ntfy:
+
+1. Give the member a token.
+2. The member opens the app and goes to **Settings → My services**.
+3. The member adds what they own.
+
+A member with no service of a kind cannot send to that kind. Your services are not shared. See [Services](/snagarr/configure/services/).
 
 ## Tokens
 
