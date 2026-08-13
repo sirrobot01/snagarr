@@ -1,0 +1,145 @@
+version: 2
+
+project_name: snagarr
+
+before:
+  hooks:
+    - go mod tidy
+    - npm --prefix web ci
+    - npm --prefix web run build
+
+builds:
+  - id: snagarr
+    main: ./cmd/snagarr
+    binary: snagarr
+    env:
+      - CGO_ENABLED=0
+    flags:
+      - -trimpath
+    ldflags:
+      - -s -w
+      - -X github.com/sirrobot01/snagarr/internal/version.Version={{ .Version }}
+      - -X github.com/sirrobot01/snagarr/internal/version.Commit={{ .ShortCommit }}
+      - -X github.com/sirrobot01/snagarr/internal/version.Date={{ .Date }}
+    mod_timestamp: "{{ .CommitTimestamp }}"
+    goos:
+      - linux
+      - darwin
+      - windows
+      - freebsd
+    goarch:
+      - amd64
+      - arm64
+      - arm
+    goarm:
+      - "7"
+    ignore:
+      - goos: darwin
+        goarch: arm
+      - goos: windows
+        goarch: arm
+      - goos: freebsd
+        goarch: arm
+      - goos: freebsd
+        goarch: arm64
+
+archives:
+  - id: snagarr
+    ids:
+      - snagarr
+    formats:
+      - tar.gz
+    format_overrides:
+      - goos: windows
+        formats:
+          - zip
+    name_template: >-
+      {{ .ProjectName }}_{{ .Version }}_{{ .Os }}_{{ .Arch }}{{ with .Arm }}v{{ . }}{{ end }}
+    files:
+      - README.md
+      - LICENSE
+      - docs
+
+checksum:
+  name_template: "{{ .ProjectName }}_{{ .Version }}_checksums.txt"
+
+snapshot:
+  version_template: "{{ incpatch .Version }}-next-{{ .ShortCommit }}"
+
+changelog:
+  sort: asc
+  filters:
+    exclude:
+      - "^docs:"
+      - "^test:"
+      - "^chore:"
+  groups:
+    - title: Features
+      regexp: '^.*?feat(\(.+\))??!?:.+$'
+      order: 0
+    - title: Fixes
+      regexp: '^.*?fix(\(.+\))??!?:.+$'
+      order: 1
+    - title: Others
+      order: 999
+
+dockers_v2:
+  - id: snagarr
+    ids:
+      - snagarr
+    dockerfile: Dockerfile.release
+    images:
+      - ghcr.io/sirrobot01/snagarr
+      - docker.io/sirrobot01/snagarr
+    tags:
+      - latest
+      - "{{ .Version }}"
+      - "{{ .Major }}.{{ .Minor }}"
+    platforms:
+      - linux/amd64
+      - linux/arm64
+    labels:
+      org.opencontainers.image.source: https://github.com/sirrobot01/snagarr
+      org.opencontainers.image.description: Self-hosted capture-and-pipeline tool for media intentions
+      org.opencontainers.image.licenses: MIT
+      org.opencontainers.image.revision: "{{ .FullCommit }}"
+      org.opencontainers.image.version: "{{ .Version }}"
+
+sboms:
+  - id: archives
+    artifacts: archive
+
+signs:
+  - id: checksum
+    cmd: cosign
+    signature: "${artifact}.sigstore.json"
+    args:
+      - sign-blob
+      - "--bundle=${signature}"
+      - "${artifact}"
+      - "--yes"
+    artifacts: checksum
+    output: true
+
+docker_signs:
+  - id: images
+    cmd: cosign
+    args:
+      - sign
+      - "${artifact}@${digest}"
+      - "--yes"
+    artifacts: all
+    output: true
+
+release:
+  github:
+    owner: sirrobot01
+    name: snagarr
+  draft: false
+  footer: |
+    ## Docker images
+
+    - `ghcr.io/sirrobot01/snagarr:{{ .Version }}`
+    - `docker.io/sirrobot01/snagarr:{{ .Version }}`
+
+    Images are multi-arch (linux/amd64, linux/arm64) and signed with cosign.

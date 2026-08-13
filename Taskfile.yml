@@ -1,0 +1,117 @@
+version: '3'
+
+dotenv: ['.env']
+
+vars:
+  BINARY: snagarr
+  VERSION_PKG: github.com/sirrobot01/snagarr/internal/version
+  VERSION:
+    sh: git describe --tags --always --dirty 2>/dev/null || echo dev
+  COMMIT:
+    sh: git rev-parse --short HEAD 2>/dev/null || echo none
+  DATE:
+    sh: date -u +%Y-%m-%dT%H:%M:%SZ
+  LDFLAGS: >-
+    -s -w
+    -X {{.VERSION_PKG}}.Version={{.VERSION}}
+    -X {{.VERSION_PKG}}.Commit={{.COMMIT}}
+    -X {{.VERSION_PKG}}.Date={{.DATE}}
+
+tasks:
+  default:
+    desc: List the available tasks
+    cmds:
+      - task --list
+    silent: true
+
+  install:
+    desc: Install the Go tools and the web dependencies
+    cmds:
+      - go install github.com/air-verse/air@latest
+      - go install github.com/golangci/golangci-lint/v2/cmd/golangci-lint@latest
+      - npm --prefix web ci
+
+  web:
+    desc: Build the React UI into internal/web/dist
+    sources:
+      - web/package.json
+      - web/package-lock.json
+      - web/index.html
+      - web/vite.config.*
+      - web/tailwind.config.*
+      - web/postcss.config.*
+      - web/tsconfig*.json
+      - web/src/**/*
+      - web/public/**/*
+    generates:
+      - internal/web/dist/index.html
+    cmds:
+      - npm --prefix web run build
+
+  build:
+    desc: Build the snagarr binary into bin/
+    deps: [web]
+    sources:
+      - '**/*.go'
+      - go.mod
+      - go.sum
+      - internal/web/dist/**/*
+    generates:
+      - bin/{{.BINARY}}
+    cmds:
+      - go build -trimpath -ldflags "{{.LDFLAGS}}" -o bin/{{.BINARY}} ./cmd/snagarr
+
+  dev:
+    desc: Run the API with live reload and the Vite dev server, which proxies /api to :8080
+    deps: [dev:api, dev:web]
+
+  dev:api:
+    internal: true
+    cmds:
+      - air -c .air.toml
+
+  dev:web:
+    internal: true
+    cmds:
+      - npm --prefix web run dev
+
+  test:
+    desc: Run the Go and the web tests
+    cmds:
+      - go test ./...
+      - npm --prefix web test
+
+  lint:
+    desc: Run golangci-lint and check the formatting
+    cmds:
+      - golangci-lint run
+      - |
+        unformatted=$(gofmt -l .)
+        if [ -n "$unformatted" ]; then
+          echo "$unformatted"
+          exit 1
+        fi
+
+  tidy:
+    desc: Tidy the Go module
+    cmds:
+      - go mod tidy
+
+  docker:
+    desc: Build the local Docker image
+    cmds:
+      - docker build -t {{.BINARY}}:{{.VERSION}} -t {{.BINARY}}:dev --build-arg VERSION={{.VERSION}} --build-arg COMMIT={{.COMMIT}} --build-arg DATE={{.DATE}} .
+
+  snapshot:
+    desc: Build an unpublished release with GoReleaser
+    cmds:
+      - goreleaser release --snapshot --clean
+
+  clean:
+    desc: Remove the build output
+    cmds:
+      - rm -rf bin dist web/dist internal/web/dist tmp
+      # internal/web embeds this directory, so the package stops compiling if
+      # the placeholder goes out with the build output.
+      - mkdir -p internal/web/dist
+      - touch internal/web/dist/.gitkeep

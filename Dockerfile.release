@@ -1,0 +1,11 @@
+# GoReleaser builds the binaries itself and gives buildx a context that holds
+# them under <os>/<arch>/, so the release image only copies. Use ./Dockerfile
+# to build from source.
+FROM gcr.io/distroless/static:nonroot
+ARG TARGETPLATFORM
+COPY $TARGETPLATFORM/snagarr /snagarr
+USER nonroot:nonroot
+EXPOSE 8080
+VOLUME /data
+ENV SNAGARR_DATA_DIR=/data
+ENTRYPOINT ["/snagarr"]

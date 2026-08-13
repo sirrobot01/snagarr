@@ -1,0 +1,90 @@
+name: CI
+
+on:
+  push:
+    branches: [main]
+  pull_request:
+
+permissions:
+  contents: read
+
+concurrency:
+  group: ci-${{ github.ref }}
+  cancel-in-progress: true
+
+jobs:
+  go:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v5
+
+      - uses: actions/setup-go@v5
+        with:
+          go-version-file: go.mod
+          cache: true
+
+      # internal/web embeds the built UI, so the package does not compile until
+      # that directory exists. This job does not need the real assets, only a
+      # file to embed. The web job builds and tests the UI for real.
+      - name: Create embedded UI placeholder
+        run: |
+          mkdir -p internal/web/dist
+          echo '<!doctype html>' > internal/web/dist/index.html
+
+      - run: go build ./...
+
+      - run: go vet ./...
+
+      - run: go test -race -coverprofile=coverage.out ./...
+
+      - name: Check formatting
+        run: |
+          unformatted=$(gofmt -l .)
+          if [ -n "$unformatted" ]; then
+            echo "$unformatted"
+            exit 1
+          fi
+
+  web:
+    runs-on: ubuntu-latest
+    defaults:
+      run:
+        working-directory: web
+    steps:
+      - uses: actions/checkout@v5
+
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 22
+          cache: npm
+          cache-dependency-path: web/package-lock.json
+
+      - run: npm ci
+
+      - run: npm run build
+
+      - run: npm test
+
+      # Build mode, because the root tsconfig only holds project references.
+      - run: npx tsc -b --noEmit
+
+  lint:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v5
+
+      - uses: actions/setup-go@v5
+        with:
+          go-version-file: go.mod
+          cache: true
+
+      # golangci-lint type-checks every package, so the embedded directory must
+      # exist here too.
+      - name: Create embedded UI placeholder
+        run: |
+          mkdir -p internal/web/dist
+          echo '<!doctype html>' > internal/web/dist/index.html
+
+      - uses: golangci/golangci-lint-action@v8
+        with:
+          version: v2.12
