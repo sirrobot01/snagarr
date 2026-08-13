@@ -24,7 +24,7 @@ export function ResultRow({ result, active, onSelect }: Props) {
   return (
     <button
       type="button"
-      className="sg-row"
+      className="sg-row sg-result-row"
       data-active={active ? '1' : undefined}
       onClick={() => onSelect(result)}
     >
@@ -50,7 +50,8 @@ export function ResultRow({ result, active, onSelect }: Props) {
 
       <Badge state={result.state} />
       <span className="sg-row-action">
-        {next.label}
+        {next.icon}
+        <span>{next.label}</span>
       </span>
     </button>
   );

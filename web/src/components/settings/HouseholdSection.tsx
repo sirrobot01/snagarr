@@ -53,7 +53,7 @@ export function HouseholdSection({ publicUrl, meId }: { publicUrl: string; meId:
         <Loading label="Loading household…" />
       )}
 
-      <div className="flex flex-wrap items-center gap-2">
+      <div className="sg-household-actions flex flex-wrap items-center gap-2">
         <button
           type="button"
           className="btn btn-secondary min-h-[44px]"

@@ -81,8 +81,8 @@ export default function List() {
 
   return (
     <>
-      <div className="sg-region sg-pad flex flex-wrap items-center gap-3 py-[14px]">
-        <div className="flex flex-wrap items-center gap-2" aria-label="Filter your list">
+      <div className="sg-list-toolbar sg-region sg-pad flex flex-wrap items-center gap-3 py-[14px]">
+        <div className="sg-filter-strip flex items-center gap-2" aria-label="Filter your list">
           {CHIPS.map(({ key, label }) => (
             <button
               key={key}
@@ -100,7 +100,7 @@ export default function List() {
           ))}
         </div>
 
-        <span className="sg-k ml-auto">
+        <span className="sg-list-count sg-k ml-auto">
           {visible.length} {visible.length === 1 ? 'item' : 'items'}
         </span>
 

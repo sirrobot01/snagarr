@@ -49,7 +49,7 @@ Snagarr stores whichever of `query` and `url` you send as `raw_input`, and treat
 
 The binary serves the client at `/`. There is nothing to install.
 
-1. Type into the search box. It is focused on load. Press `/` anywhere to return to it.
+1. Type into the search box. It is focused on desktop load; touch devices open without forcing the keyboard. Press `/` anywhere to return to it.
 2. Read the results. Library matches rank first. Every row carries one state badge.
 3. Select a result. The item saves at once, with an undo toast.
 
@@ -83,7 +83,7 @@ Snagarr publishes one Shortcut, named **Snag**. Apple signs it, so it imports wi
 https://www.icloud.com/shortcuts/c4b4dabe0b55481c9fe35fac0a4a266b
 ```
 
-Open that link on the device. Snagarr keeps no copy of it in the settings: the Shortcut is the same for every install, and the address and token come from the import questions.
+Open that link on the device, or select **Add the Apple Shortcut** in Snagarr's Settings. The Shortcut is the same for every install, and the address and token come from the import questions.
 
 ### Install it
 

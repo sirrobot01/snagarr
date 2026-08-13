@@ -1,4 +1,5 @@
 import { useEffect, useRef, useState } from 'react';
+import { CircleUserRound, Library, Search, Settings2 } from 'lucide-react';
 import { Link, useLocation } from 'wouter';
 
 import { clearToken } from '../lib/auth';
@@ -7,9 +8,9 @@ import { Logo } from './Logo';
 import { ThemeToggle } from './ThemeToggle';
 
 const LINKS = [
-  { href: '/', label: 'Snag' },
-  { href: '/list', label: 'List' },
-  { href: '/settings', label: 'Settings' },
+  { href: '/', label: 'Snag', icon: Search },
+  { href: '/list', label: 'List', icon: Library },
+  { href: '/settings', label: 'Settings', icon: Settings2 },
 ];
 
 export function Nav({ me }: { me: UserRef | undefined }) {
@@ -48,7 +49,7 @@ export function Nav({ me }: { me: UserRef | undefined }) {
         </Link>
 
         <nav className="nav-links" aria-label="Main navigation">
-          {LINKS.map(({ href, label }) => (
+          {LINKS.map(({ href, label, icon: Icon }) => (
             <Link
               key={href}
               href={href}
@@ -56,7 +57,8 @@ export function Nav({ me }: { me: UserRef | undefined }) {
               aria-label={label}
               aria-current={location === href ? 'page' : undefined}
             >
-              {label}
+              <Icon className="nav-link-icon" aria-hidden="true" />
+              <span className="nav-link-label">{label}</span>
             </Link>
           ))}
         </nav>
@@ -75,6 +77,9 @@ export function Nav({ me }: { me: UserRef | undefined }) {
               aria-controls="account-menu"
               onClick={() => setAccountOpen((open) => !open)}
             >
+              <span className="nav-avatar" aria-hidden="true">
+                <CircleUserRound size={19} />
+              </span>
               <span className="nav-account-copy">
                 <span className="nav-account-name">{me.username}</span>
               </span>

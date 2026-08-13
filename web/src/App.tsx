@@ -41,6 +41,13 @@ export function App() {
   const token = useSyncExternalStore(subscribeToken, getToken, getToken);
   const [location, navigate] = useLocation();
 
+  // Each destination is a screen in the installed app. Wouter deliberately
+  // leaves scroll restoration to the product, but carrying a deep List scroll
+  // into Settings makes the next screen look as though its header is missing.
+  useEffect(() => {
+    window.scrollTo(0, 0);
+  }, [location]);
+
   /* `/` returns to the capture box from anywhere, unless a field has focus. */
   useEffect(() => {
     function onKeyDown(event: KeyboardEvent) {

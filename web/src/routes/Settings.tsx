@@ -1,5 +1,5 @@
 import type { ReactNode } from 'react';
-import { RotateCcw, Save } from 'lucide-react';
+import { ExternalLink, RotateCcw, Save, Smartphone } from 'lucide-react';
 import { useSettingsDraft, type Draft } from '../components/settings/draft';
 import { GeneralCard } from '../components/settings/GeneralCard';
 import { HouseholdSection } from '../components/settings/HouseholdSection';
@@ -9,6 +9,9 @@ import { TmdbCard } from '../components/settings/TmdbCard';
 import { isAdmin, useMe, useSaveSettings, useSettings } from '../lib/queries';
 import { pushToast } from '../lib/toast';
 import type { Settings as GlobalSettings } from '../lib/types';
+
+const APPLE_SHORTCUT_URL =
+  'https://www.icloud.com/shortcuts/c4b4dabe0b55481c9fe35fac0a4a266b';
 
 export default function Settings() {
   const me = useMe();
@@ -40,6 +43,7 @@ export default function Settings() {
         title="My connections"
         note="Connect the services you use. Other household members manage their own."
       />
+      <AppleShortcut />
       <MyServices />
 
       {admin && settings.isError && (
@@ -56,6 +60,31 @@ export default function Settings() {
         <GlobalCards settings={settings.data} draft={draft} meId={me.data.id} />
       )}
     </>
+  );
+}
+
+function AppleShortcut() {
+  return (
+    <aside className="sg-shortcut-panel sg-pad" aria-label="Apple Shortcut">
+      <a
+        className="sg-shortcut-link"
+        href={APPLE_SHORTCUT_URL}
+        target="_blank"
+        rel="external noopener noreferrer"
+      >
+        <span className="sg-shortcut-icon" aria-hidden="true">
+          <Smartphone size={19} />
+        </span>
+        <span className="sg-shortcut-copy">
+          <strong>Add the Apple Shortcut</strong>
+          <span>Snag from the Share Sheet, Home Screen, or Apple Watch.</span>
+        </span>
+        <span className="sg-shortcut-action">
+          Add Shortcut
+          <ExternalLink aria-hidden="true" size={15} />
+        </span>
+      </a>
+    </aside>
   );
 }
 
@@ -83,7 +112,7 @@ function GlobalCards({
       </div>
 
       {draft.dirty && (
-        <div className="sg-pad sg-region flex flex-wrap items-center gap-3 py-3">
+        <div className="sg-savebar sg-pad sg-region flex flex-wrap items-center gap-3 py-3">
           <span className="sg-k">Unsaved changes</span>
           <button
             type="button"

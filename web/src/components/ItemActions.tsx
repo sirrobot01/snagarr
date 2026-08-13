@@ -33,7 +33,7 @@ export function ItemActions({ item, admin, variant, onDone }: Props) {
   }
 
   return (
-    <div className={stacked ? 'flex flex-col p-4 pt-0' : 'sg-pop-actions'}>
+    <div className={stacked ? 'sg-sheet-actions flex flex-col p-4 pt-0' : 'sg-pop-actions'}>
       {admin && (
         <button
           type="button"

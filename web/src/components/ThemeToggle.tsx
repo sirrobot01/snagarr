@@ -1,4 +1,5 @@
 import { useState } from 'react';
+import { Moon, Sun } from 'lucide-react';
 
 type Theme = 'dark' | 'light';
 
@@ -13,6 +14,9 @@ export function ThemeToggle() {
   function flip() {
     document.documentElement.dataset.theme = next;
     localStorage.setItem('snagarr.theme', next);
+    document
+      .querySelector('meta[name="theme-color"]')
+      ?.setAttribute('content', next === 'dark' ? '#201e1d' : '#f3f2f2');
     setTheme(next);
   }
 
@@ -24,7 +28,7 @@ export function ThemeToggle() {
       aria-label={`Switch to ${next} theme`}
       title={`Switch to ${next} theme`}
     >
-      {next}
+      {next === 'light' ? <Sun aria-hidden="true" /> : <Moon aria-hidden="true" />}
     </button>
   );
 }

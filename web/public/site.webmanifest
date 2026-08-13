@@ -2,6 +2,7 @@
   "name": "Snagarr",
   "short_name": "Snagarr",
   "description": "Snag it now, watch it later.",
+  "id": "/",
   "start_url": "/",
   "scope": "/",
   "display": "standalone",

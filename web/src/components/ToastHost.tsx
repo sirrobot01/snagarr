@@ -45,7 +45,7 @@ export function ToastHost() {
           </Toast.Close>
         </Toast.Root>
       ))}
-      <Toast.Viewport className="fixed bottom-4 left-4 right-4 z-[60] m-0 flex list-none flex-col gap-2 p-0 outline-none md:left-auto md:right-5 md:w-[400px]" />
+      <Toast.Viewport className="sg-toast-viewport fixed left-4 right-4 z-[60] m-0 flex list-none flex-col gap-2 p-0 outline-none md:left-auto md:right-5 md:w-[400px]" />
     </Toast.Provider>
   );
 }
