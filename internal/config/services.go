@@ -89,7 +89,7 @@ func DefaultServiceConfig(kind store.ServiceKind) []byte {
 }
 
 // seededName is the name every environment-configured service gets, matching
-// the name the settings migration gives the ones it moves.
+// the name the API gives a service created without one.
 const seededName = "Default"
 
 // SeedServices gives the first admin the services the environment describes, so

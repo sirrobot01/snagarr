@@ -1,67 +1,65 @@
-import type { ArrSettings, LibrarySettings } from '../../lib/types';
+import type { ServiceConfig, ServiceKind } from '../../lib/types';
 import { SelectField, TextField } from './fields';
 import { useServiceOptions } from './service';
 
-export const PROVIDERS: { value: Exclude<LibrarySettings['provider'], ''>; label: string }[] = [
-  { value: 'plex', label: 'Plex' },
-  { value: 'emby', label: 'Emby' },
-  { value: 'jellyfin', label: 'Jellyfin' },
-];
+interface Props {
+  id: number;
+  kind: ServiceKind;
+  config: ServiceConfig;
+  locked: boolean;
+  /** The lookup reads the stored credentials, so unsaved edits hold it back. */
+  ready: boolean;
+  onChange: (values: ServiceConfig) => void;
+}
 
-function numberOrNull(value: string): number | null {
+function toId(value: string): number {
   const parsed = Number(value.trim());
-  return value.trim() === '' || !Number.isFinite(parsed) ? null : parsed;
+  return Number.isFinite(parsed) ? parsed : 0;
 }
 
 function freeSpace(bytes: number): string {
   return bytes > 0 ? ` · ${Math.round(bytes / 1e9)} GB FREE` : '';
 }
 
-interface ArrProps {
-  service: 'radarr' | 'sonarr';
-  current: ArrSettings;
-  onChange: (values: Partial<ArrSettings>) => void;
-}
-
-/* The live lookup only answers for stored credentials, so an unsaved service
-   falls back to the free-text fields it would have shown before the API. */
-export function ArrOptionFields({ service, current, onChange }: ArrProps) {
-  const options = useServiceOptions(service, current.configured);
+/* Without stored credentials the live lookup cannot answer, so each field falls
+   back to the free text it would have asked for before the API existed. */
+export function ArrOptionFields({ id, kind, config, locked, ready, onChange }: Props) {
+  const options = useServiceOptions(id, ready);
   const profiles = options.data?.quality_profiles ?? [];
   const folders = options.data?.root_folders ?? [];
-  const profile = current.quality_profile_id === null ? '' : String(current.quality_profile_id);
+  const profile = config.quality_profile_id ? String(config.quality_profile_id) : '';
 
   return (
     <>
       {profiles.length > 0 ? (
         <SelectField
-          id={`${service}-profile`}
+          id={`svc-${id}-profile`}
           label="Quality profile"
           placeholder="Choose a profile"
           value={profile}
-          locked={current.locked}
+          locked={locked}
           options={profiles.map((item) => ({ value: String(item.id), label: item.name }))}
-          onChange={(value) => onChange({ quality_profile_id: numberOrNull(value) })}
+          onChange={(value) => onChange({ quality_profile_id: toId(value) })}
         />
       ) : (
         <TextField
-          id={`${service}-profile`}
+          id={`svc-${id}-profile`}
           label="Quality profile ID"
           value={profile}
-          locked={current.locked}
+          locked={locked}
           inputMode="numeric"
           placeholder="4"
-          onChange={(value) => onChange({ quality_profile_id: numberOrNull(value) })}
+          onChange={(value) => onChange({ quality_profile_id: toId(value) })}
         />
       )}
 
       {folders.length > 0 ? (
         <SelectField
-          id={`${service}-root`}
+          id={`svc-${id}-root`}
           label="Root folder"
           placeholder="Choose a folder"
-          value={current.root_folder}
-          locked={current.locked}
+          value={config.root_folder ?? ''}
+          locked={locked}
           options={folders.map((item) => ({
             value: item.path,
             label: `${item.path}${freeSpace(item.free_space)}`,
@@ -70,11 +68,11 @@ export function ArrOptionFields({ service, current, onChange }: ArrProps) {
         />
       ) : (
         <TextField
-          id={`${service}-root`}
+          id={`svc-${id}-root`}
           label="Root folder"
-          value={current.root_folder}
-          locked={current.locked}
-          placeholder={service === 'radarr' ? '/movies' : '/tv'}
+          value={config.root_folder ?? ''}
+          locked={locked}
+          placeholder={kind === 'radarr' ? '/movies' : '/tv'}
           onChange={(value) => onChange({ root_folder: value })}
         />
       )}
@@ -82,22 +80,18 @@ export function ArrOptionFields({ service, current, onChange }: ArrProps) {
   );
 }
 
-interface SectionsProps {
-  current: LibrarySettings;
-  onChange: (values: Partial<LibrarySettings>) => void;
-}
-
-export function SectionsField({ current, onChange }: SectionsProps) {
-  const options = useServiceOptions('library', current.configured);
+export function SectionsField({ id, config, locked, ready, onChange }: Omit<Props, 'kind'>) {
+  const options = useServiceOptions(id, ready);
   const sections = options.data?.sections ?? [];
+  const selected = config.section_ids ?? [];
 
   if (sections.length === 0) {
     return (
       <TextField
-        id="library-sections"
+        id={`svc-${id}-sections`}
         label="Section IDs"
-        value={current.section_ids.join(', ')}
-        locked={current.locked}
+        value={selected.join(', ')}
+        locked={locked}
         placeholder="1, 2"
         onChange={(value) =>
           onChange({ section_ids: value.split(',').map((part) => part.trim()).filter(Boolean) })
@@ -108,15 +102,15 @@ export function SectionsField({ current, onChange }: SectionsProps) {
 
   return (
     <div className="field">
-      <label htmlFor="library-sections">Libraries to index</label>
+      <label htmlFor={`svc-${id}-sections`}>Libraries to index</label>
       <select
-        id="library-sections"
+        id={`svc-${id}-sections`}
         className="input"
         style={{ minHeight: 44 }}
         multiple
         size={Math.min(4, sections.length)}
-        value={current.section_ids}
-        disabled={current.locked}
+        value={selected}
+        disabled={locked}
         onChange={(event) =>
           onChange({
             section_ids: Array.from(event.currentTarget.selectedOptions, (option) => option.value),

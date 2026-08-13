@@ -10,15 +10,13 @@ import (
 
 	"github.com/go-chi/chi/v5"
 
-	"github.com/sirrobot01/snagarr/internal/arr"
-	"github.com/sirrobot01/snagarr/internal/clients"
 	"github.com/sirrobot01/snagarr/internal/config"
+	"github.com/sirrobot01/snagarr/internal/integration"
 	"github.com/sirrobot01/snagarr/internal/store"
 )
 
-// defaultServiceName matches the name the settings migration and the
-// environment seeding both use, so an install that never opens this API still
-// reads the same as one that does.
+// defaultServiceName matches the name the environment seeding uses, so an
+// install that never opens this API still reads the same as one that does.
 const defaultServiceName = "Default"
 
 type serviceDTO struct {
@@ -153,7 +151,7 @@ func (s *Server) createService(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 	// New credentials usually mean new indexes to build.
-	s.engine.Trigger()
+	s.reconciler.Trigger()
 	s.respondWithService(w, *svc, http.StatusCreated)
 }
 
@@ -196,7 +194,7 @@ func (s *Server) updateService(w http.ResponseWriter, r *http.Request) {
 		s.writeStoreError(w, err, "service")
 		return
 	}
-	s.engine.Trigger()
+	s.reconciler.Trigger()
 	s.respondWithService(w, *svc, http.StatusOK)
 }
 
@@ -210,7 +208,7 @@ func (s *Server) deleteService(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 	// The index rows went with it, so the household state has to be recomputed.
-	s.engine.Trigger()
+	s.reconciler.Trigger()
 	w.WriteHeader(http.StatusNoContent)
 }
 
@@ -232,31 +230,31 @@ func (s *Server) testService(w http.ResponseWriter, r *http.Request) {
 func ping(ctx context.Context, svc store.Service) (string, error) {
 	switch {
 	case svc.Kind.Library():
-		built, err := clients.BuildLibrary(svc)
+		built, err := integration.BuildLibrary(svc)
 		if err != nil {
 			return "", err
 		}
 		return built.Client.Ping(ctx)
 	case svc.Kind == store.KindRadarr:
-		built, err := clients.BuildRadarr(svc)
+		built, err := integration.BuildRadarr(svc)
 		if err != nil {
 			return "", err
 		}
 		return built.Client.Ping(ctx)
 	case svc.Kind == store.KindSonarr:
-		built, err := clients.BuildSonarr(svc)
+		built, err := integration.BuildSonarr(svc)
 		if err != nil {
 			return "", err
 		}
 		return built.Client.Ping(ctx)
 	case svc.Kind == store.KindOverseerr:
-		built, err := clients.BuildOverseerr(svc)
+		built, err := integration.BuildOverseerr(svc)
 		if err != nil {
 			return "", err
 		}
 		return built.Client.Ping(ctx)
 	case svc.Kind == store.KindNtfy:
-		built, err := clients.BuildNtfy(svc)
+		built, err := integration.BuildNtfy(svc)
 		if err != nil {
 			return "", err
 		}
@@ -277,21 +275,21 @@ func (s *Server) serviceOptions(w http.ResponseWriter, r *http.Request) {
 
 	switch {
 	case svc.Kind == store.KindRadarr:
-		built, err := clients.BuildRadarr(*svc)
+		built, err := integration.BuildRadarr(*svc)
 		if err != nil {
 			writeError(w, http.StatusServiceUnavailable, codeNotConfigured, "%v", err)
 			return
 		}
 		s.writeArrOptions(ctx, w, built.Client)
 	case svc.Kind == store.KindSonarr:
-		built, err := clients.BuildSonarr(*svc)
+		built, err := integration.BuildSonarr(*svc)
 		if err != nil {
 			writeError(w, http.StatusServiceUnavailable, codeNotConfigured, "%v", err)
 			return
 		}
 		s.writeArrOptions(ctx, w, built.Client)
 	case svc.Kind.Library():
-		built, err := clients.BuildLibrary(*svc)
+		built, err := integration.BuildLibrary(*svc)
 		if err != nil {
 			writeError(w, http.StatusServiceUnavailable, codeNotConfigured, "%v", err)
 			return
@@ -311,11 +309,11 @@ func (s *Server) serviceOptions(w http.ResponseWriter, r *http.Request) {
 	}
 }
 
-// arrOptions is satisfied by both *arr.Radarr and *arr.Sonarr, which expose the
-// same two lookups.
+// arrOptions is satisfied by both *integration.RadarrClient and
+// *integration.SonarrClient, which expose the same two lookups.
 type arrOptions interface {
-	QualityProfiles(ctx context.Context) ([]arr.Profile, error)
-	RootFolders(ctx context.Context) ([]arr.RootFolder, error)
+	QualityProfiles(ctx context.Context) ([]integration.Profile, error)
+	RootFolders(ctx context.Context) ([]integration.RootFolder, error)
 }
 
 func (s *Server) writeArrOptions(ctx context.Context, w http.ResponseWriter, c arrOptions) {
@@ -396,12 +394,12 @@ func (s *Server) respondWithService(w http.ResponseWriter, svc store.Service, st
 // household builds every enabled service in the install. State is the union of
 // what all of them report, and a personal action falls back through them, so
 // both need the whole set.
-func (s *Server) household(ctx context.Context) (clients.Household, error) {
+func (s *Server) household(ctx context.Context) (integration.Household, error) {
 	services, err := s.store.Services(ctx)
 	if err != nil {
-		return clients.Household{}, err
+		return integration.Household{}, err
 	}
-	house, err := clients.BuildHousehold(services)
+	house, err := integration.BuildHousehold(services)
 	if err != nil {
 		s.log.Warn("some services could not be built", "error", err)
 	}

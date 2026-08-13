@@ -3,13 +3,9 @@ package store
 import (
 	"bytes"
 	"context"
-	"database/sql"
-	"encoding/json"
 	"path/filepath"
 	"testing"
 	"time"
-
-	"github.com/sirrobot01/snagarr/internal/media"
 )
 
 func newTestStore(t *testing.T) *Store {
@@ -104,8 +100,8 @@ func TestItemLifecycle(t *testing.T) {
 	}
 
 	candidates := []Candidate{
-		{TMDBID: 426063, MediaType: media.Movie, Title: "Nosferatu", Year: 2024, Score: 0.94},
-		{TMDBID: 11800, MediaType: media.Movie, Title: "Shadow of the Vampire", Year: 2000, Score: 0.71},
+		{TMDBID: 426063, MediaType: Movie, Title: "Nosferatu", Year: 2024, Score: 0.94},
+		{TMDBID: 11800, MediaType: Movie, Title: "Shadow of the Vampire", Year: 2000, Score: 0.71},
 	}
 	if err := s.SetCandidates(ctx, it.ID, candidates); err != nil {
 		t.Fatalf("set candidates: %v", err)
@@ -139,7 +135,7 @@ func TestItemLifecycle(t *testing.T) {
 	}
 
 	// Capture is idempotent per TMDB ID.
-	dup, err := s.ItemByTMDB(ctx, 426063, media.Movie)
+	dup, err := s.ItemByTMDB(ctx, 426063, Movie)
 	if err != nil || dup.ID != it.ID {
 		t.Errorf("ItemByTMDB = %v, %v; want the existing item", dup, err)
 	}
@@ -181,7 +177,7 @@ func TestStateIndexArithmetic(t *testing.T) {
 	overseerr := newTestService(t, s, u.ID, KindOverseerr, "Default")
 
 	if err := s.UpsertLibrary(ctx, plex.ID, []LibraryEntry{
-		{ProviderItemID: "1001", TMDBID: 100, MediaType: media.Movie, Title: "Sinners", Year: 2025},
+		{ProviderItemID: "1001", TMDBID: 100, MediaType: Movie, Title: "Sinners", Year: 2025},
 	}); err != nil {
 		t.Fatalf("upsert library: %v", err)
 	}
@@ -192,7 +188,7 @@ func TestStateIndexArithmetic(t *testing.T) {
 		t.Fatalf("replace arr index: %v", err)
 	}
 	if err := s.ReplaceRequests(ctx, overseerr.ID, []RequestEntry{
-		{RequestID: 418, TMDBID: 400, MediaType: media.TV, Status: "pending"},
+		{RequestID: 418, TMDBID: 400, MediaType: TV, Status: "pending"},
 	}); err != nil {
 		t.Fatalf("replace requests: %v", err)
 	}
@@ -207,11 +203,11 @@ func TestStateIndexArithmetic(t *testing.T) {
 		key  TitleKey
 		want Status
 	}{
-		{"in library", TitleKey{100, media.Movie}, StatusAvailable},
-		{"monitored without a file", TitleKey{200, media.Movie}, StatusMonitored},
-		{"monitored with a file", TitleKey{300, media.Movie}, StatusAvailable},
-		{"requested", TitleKey{400, media.TV}, StatusRequested},
-		{"unknown", TitleKey{999, media.Movie}, StatusNew},
+		{"in library", TitleKey{100, Movie}, StatusAvailable},
+		{"monitored without a file", TitleKey{200, Movie}, StatusMonitored},
+		{"monitored with a file", TitleKey{300, Movie}, StatusAvailable},
+		{"requested", TitleKey{400, TV}, StatusRequested},
+		{"unknown", TitleKey{999, Movie}, StatusNew},
 	}
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
@@ -229,8 +225,8 @@ func TestTombstoneLibraryDropsUnseenTitles(t *testing.T) {
 	plex := newTestService(t, s, u.ID, KindPlex, "Default")
 
 	if err := s.UpsertLibrary(ctx, plex.ID, []LibraryEntry{
-		{ProviderItemID: "1", TMDBID: 1, MediaType: media.Movie, Title: "Kept"},
-		{ProviderItemID: "2", TMDBID: 2, MediaType: media.Movie, Title: "Deleted"},
+		{ProviderItemID: "1", TMDBID: 1, MediaType: Movie, Title: "Kept"},
+		{ProviderItemID: "2", TMDBID: 2, MediaType: Movie, Title: "Deleted"},
 	}); err != nil {
 		t.Fatalf("seed: %v", err)
 	}
@@ -240,7 +236,7 @@ func TestTombstoneLibraryDropsUnseenTitles(t *testing.T) {
 	time.Sleep(10 * time.Millisecond)
 
 	if err := s.UpsertLibrary(ctx, plex.ID, []LibraryEntry{
-		{ProviderItemID: "1", TMDBID: 1, MediaType: media.Movie, Title: "Kept"},
+		{ProviderItemID: "1", TMDBID: 1, MediaType: Movie, Title: "Kept"},
 	}); err != nil {
 		t.Fatalf("resweep: %v", err)
 	}
@@ -263,8 +259,8 @@ func TestSearchLibrary(t *testing.T) {
 	plex := newTestService(t, s, u.ID, KindPlex, "Default")
 
 	if err := s.UpsertLibrary(ctx, plex.ID, []LibraryEntry{
-		{ProviderItemID: "1", TMDBID: 1, MediaType: media.Movie, Title: "Sinners", Year: 2025},
-		{ProviderItemID: "2", TMDBID: 2, MediaType: media.TV, Title: "Severance", Year: 2022},
+		{ProviderItemID: "1", TMDBID: 1, MediaType: Movie, Title: "Sinners", Year: 2025},
+		{ProviderItemID: "2", TMDBID: 2, MediaType: TV, Title: "Severance", Year: 2022},
 	}); err != nil {
 		t.Fatalf("seed: %v", err)
 	}
@@ -306,7 +302,7 @@ func TestStateIndexUnionsTheHousehold(t *testing.T) {
 	radarr := newTestService(t, s, b.ID, KindRadarr, "Mine")
 
 	if err := s.UpsertLibrary(ctx, plex.ID, []LibraryEntry{
-		{ProviderItemID: "1001", TMDBID: 100, MediaType: media.Movie, Title: "Sinners"},
+		{ProviderItemID: "1001", TMDBID: 100, MediaType: Movie, Title: "Sinners"},
 	}); err != nil {
 		t.Fatalf("upsert library: %v", err)
 	}
@@ -320,10 +316,10 @@ func TestStateIndexUnionsTheHousehold(t *testing.T) {
 	if err != nil {
 		t.Fatalf("load state index: %v", err)
 	}
-	if got := idx.State(TitleKey{100, media.Movie}); got != StatusAvailable {
+	if got := idx.State(TitleKey{100, Movie}); got != StatusAvailable {
 		t.Errorf("state of A's library title = %q, want available", got)
 	}
-	if got := idx.State(TitleKey{200, media.Movie}); got != StatusMonitored {
+	if got := idx.State(TitleKey{200, Movie}); got != StatusMonitored {
 		t.Errorf("state of B's monitored title = %q, want monitored", got)
 	}
 
@@ -332,7 +328,7 @@ func TestStateIndexUnionsTheHousehold(t *testing.T) {
 	if err != nil {
 		t.Fatalf("library members: %v", err)
 	}
-	if got := members[plex.ID][TitleKey{100, media.Movie}]; got != "1001" {
+	if got := members[plex.ID][TitleKey{100, Movie}]; got != "1001" {
 		t.Errorf("plex member id = %q, want 1001", got)
 	}
 	if len(members) != 1 {
@@ -394,95 +390,6 @@ func TestServiceLifecycle(t *testing.T) {
 	}
 }
 
-// The release before services shipped kept every integration in one settings
-// blob. Migration moves the configured ones onto the operator who set them up.
-func TestSettingsMigrateOntoTheFirstAdmin(t *testing.T) {
-	ctx := context.Background()
-	path := filepath.Join(t.TempDir(), "snagarr.db")
-	key := make([]byte, 32)
-
-	db, err := sql.Open("sqlite", "file:"+path)
-	if err != nil {
-		t.Fatalf("open raw database: %v", err)
-	}
-	if _, err := db.Exec(migrations[0]); err != nil {
-		t.Fatalf("apply migration 1: %v", err)
-	}
-	if _, err := db.Exec(`PRAGMA user_version = 1`); err != nil {
-		t.Fatalf("set version: %v", err)
-	}
-	if _, err := db.Exec(`INSERT INTO users (display_name, role, created_at) VALUES (?, ?, ?)`,
-		"Admin", RoleAdmin, time.Now().UTC()); err != nil {
-		t.Fatalf("seed admin: %v", err)
-	}
-	legacy := &Store{db: db, key: key}
-	blob := []byte(`{
-		"tmdb":{"api_key":"tmdb-key"},
-		"library":{"provider":"plex","url":"http://plex:32400","token":"px","collection_name":"Snagged"},
-		"radarr":{"url":"http://radarr:7878","api_key":"radarr-key","root_folder":"/movies"},
-		"sonarr":{"url":"","api_key":""},
-		"general":{"public_url":"http://home"}}`)
-	if err := legacy.SetSetting(ctx, settingsKey, blob); err != nil {
-		t.Fatalf("seed settings: %v", err)
-	}
-	db.Close()
-
-	s, err := Open(path, key)
-	if err != nil {
-		t.Fatalf("migrate: %v", err)
-	}
-	t.Cleanup(func() { s.Close() })
-
-	services, err := s.Services(ctx)
-	if err != nil {
-		t.Fatalf("list services: %v", err)
-	}
-	byKind := map[ServiceKind]Service{}
-	for _, svc := range services {
-		byKind[svc.Kind] = svc
-	}
-	if len(services) != 2 {
-		t.Fatalf("migrated %d services, want plex and radarr only: %v", len(services), services)
-	}
-	radarr, ok := byKind[KindRadarr]
-	if !ok {
-		t.Fatal("the configured Radarr did not migrate")
-	}
-	if radarr.UserID != 1 || radarr.Name != "Default" {
-		t.Errorf("migrated Radarr = user %d %q, want user 1 \"Default\"", radarr.UserID, radarr.Name)
-	}
-	var radarrConfig map[string]any
-	if err := json.Unmarshal(radarr.Config, &radarrConfig); err != nil {
-		t.Fatalf("decode migrated config: %v", err)
-	}
-	if radarrConfig["api_key"] != "radarr-key" || radarrConfig["root_folder"] != "/movies" {
-		t.Errorf("migrated Radarr config = %v, want the settings values", radarrConfig)
-	}
-	if _, ok := byKind[KindPlex]; !ok {
-		t.Error("the library section did not migrate to a plex service")
-	}
-	if _, ok := byKind[KindSonarr]; ok {
-		t.Error("an empty Sonarr section became a service")
-	}
-
-	raw, err := s.Setting(ctx, settingsKey)
-	if err != nil {
-		t.Fatalf("read migrated settings: %v", err)
-	}
-	var document map[string]json.RawMessage
-	if err := json.Unmarshal(raw, &document); err != nil {
-		t.Fatalf("decode migrated settings: %v", err)
-	}
-	for _, section := range []string{"radarr", "sonarr", "library"} {
-		if _, ok := document[section]; ok {
-			t.Errorf("settings still carry the %q section", section)
-		}
-	}
-	if _, ok := document["tmdb"]; !ok {
-		t.Error("tmdb left the settings document; it stays global")
-	}
-}
-
 func TestSettingsAreEncryptedAtRest(t *testing.T) {
 	ctx := context.Background()
 	s := newTestStore(t)
@@ -530,7 +437,7 @@ func TestCounts(t *testing.T) {
 		{StatusAvailable, 5, true},
 	}
 	for _, sd := range seed {
-		it := &Item{Title: "x", RawInput: "x", Status: sd.status, Source: SourceWeb, TMDBID: sd.tmdbID, MediaType: media.Movie}
+		it := &Item{Title: "x", RawInput: "x", Status: sd.status, Source: SourceWeb, TMDBID: sd.tmdbID, MediaType: Movie}
 		if err := s.CreateItem(ctx, it); err != nil {
 			t.Fatalf("seed: %v", err)
 		}

@@ -3,9 +3,8 @@ import { useLocation } from 'wouter';
 import { useSettingsDraft } from '../components/settings/draft';
 import { ErrorState, Loading } from '../components/settings/states';
 import { SetupCard } from '../components/setup/SetupCard';
-import { StepArr } from '../components/setup/StepArr';
 import { StepDone } from '../components/setup/StepDone';
-import { StepLibrary } from '../components/setup/StepLibrary';
+import { StepServices } from '../components/setup/StepServices';
 import { StepTmdb } from '../components/setup/StepTmdb';
 import { useSaveSettings, useSettings } from '../lib/queries';
 
@@ -38,6 +37,8 @@ export default function Setup() {
   const page = STEPS[step];
   const last = step === STEPS.length - 1;
 
+  /* Only step 1 writes settings. The service steps save themselves card by
+     card, because a service has to exist before it can be tested. */
   async function advance(persist: boolean) {
     if (persist && draft.dirty) {
       try {
@@ -105,9 +106,19 @@ export default function Setup() {
       }
     >
       {step === 0 && <StepTmdb settings={settings.data} draft={draft} />}
-      {step === 1 && <StepLibrary settings={settings.data} draft={draft} />}
-      {step === 2 && <StepArr settings={settings.data} draft={draft} />}
-      {step === 3 && <StepDone settings={settings.data} />}
+      {step === 1 && (
+        <StepServices
+          kinds={['plex', 'emby', 'jellyfin']}
+          empty="Add your media server, then sign in or paste a token. Plex can sign you in."
+        />
+      )}
+      {step === 2 && (
+        <StepServices
+          kinds={['radarr', 'sonarr']}
+          empty="Test each service to load its quality profiles and root folders. Skip this step if you send everything through Overseerr."
+        />
+      )}
+      {step === 3 && <StepDone />}
     </SetupCard>
   );
 }

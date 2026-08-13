@@ -9,8 +9,6 @@ import (
 	"time"
 
 	"github.com/go-chi/chi/v5"
-
-	"github.com/sirrobot01/snagarr/internal/shortcut"
 )
 
 // A generated Shortcut carries a live bearer token, and the operator will paste
@@ -71,10 +69,10 @@ func (s *Server) serveShortcut(w http.ResponseWriter, r *http.Request) {
 		s.log.Warn("could not consume shortcut link", "error", err)
 	}
 
-	body, err := shortcut.Build(shortcut.Options{
+	body, err := buildShortcutFile(shortcutOptions{
 		BaseURL: s.publicBase(r),
 		Token:   string(secret),
-		Name:    shortcut.DefaultName,
+		Name:    defaultShortcutName,
 	})
 	if err != nil {
 		s.log.Error("could not build shortcut", "error", err)
@@ -83,7 +81,7 @@ func (s *Server) serveShortcut(w http.ResponseWriter, r *http.Request) {
 	}
 
 	w.Header().Set("Content-Type", "application/octet-stream")
-	w.Header().Set("Content-Disposition", `attachment; filename="`+shortcut.DefaultName+`.shortcut"`)
+	w.Header().Set("Content-Disposition", `attachment; filename="`+defaultShortcutName+`.shortcut"`)
 	w.Header().Set("Cache-Control", "no-store")
 	if _, err := w.Write(body); err != nil {
 		s.log.Warn("could not write shortcut", "error", err)

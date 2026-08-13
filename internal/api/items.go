@@ -9,21 +9,18 @@ import (
 
 	"github.com/go-chi/chi/v5"
 
-	"github.com/sirrobot01/snagarr/internal/arr"
-	"github.com/sirrobot01/snagarr/internal/clients"
-	"github.com/sirrobot01/snagarr/internal/media"
+	"github.com/sirrobot01/snagarr/internal/integration"
 	"github.com/sirrobot01/snagarr/internal/store"
-	"github.com/sirrobot01/snagarr/internal/tmdb"
 )
 
 type captureRequest struct {
-	Query     string       `json:"query"`
-	URL       string       `json:"url"`
-	TMDBID    int64        `json:"tmdb_id"`
-	MediaType media.Type   `json:"media_type"`
-	Source    store.Source `json:"source"`
-	Note      string       `json:"note"`
-	SourceURL string       `json:"source_url"`
+	Query     string          `json:"query"`
+	URL       string          `json:"url"`
+	TMDBID    int64           `json:"tmdb_id"`
+	MediaType store.MediaType `json:"media_type"`
+	Source    store.Source    `json:"source"`
+	Note      string          `json:"note"`
+	SourceURL string          `json:"source_url"`
 }
 
 // capture is the endpoint the whole product hangs off. It must never lose an
@@ -123,7 +120,7 @@ func (s *Server) captureKnownTitle(w http.ResponseWriter, r *http.Request, req c
 	}
 
 	s.cacheEntity(ctx, details)
-	if err := s.engine.RefreshItem(ctx, it.ID); err != nil {
+	if err := s.reconciler.RefreshItem(ctx, it.ID); err != nil {
 		s.log.Warn("could not compute state for new item", "item", it.ID, "error", err)
 	}
 
@@ -135,7 +132,7 @@ func (s *Server) captureKnownTitle(w http.ResponseWriter, r *http.Request, req c
 	writeJSON(w, http.StatusCreated, newItemDTO(*saved))
 }
 
-func (s *Server) resolveInBackground(ctx context.Context, client *tmdb.Client, itemID int64) {
+func (s *Server) resolveInBackground(ctx context.Context, client *integration.TMDBClient, itemID int64) {
 	ctx, cancel := context.WithTimeout(ctx, 60*time.Second)
 	defer cancel()
 
@@ -143,7 +140,7 @@ func (s *Server) resolveInBackground(ctx context.Context, client *tmdb.Client, i
 		s.log.Warn("capture could not be resolved", "item", itemID, "error", err)
 		return
 	}
-	if err := s.engine.RefreshItem(ctx, itemID); err != nil {
+	if err := s.reconciler.RefreshItem(ctx, itemID); err != nil {
 		s.log.Warn("could not compute state after resolve", "item", itemID, "error", err)
 	}
 }
@@ -152,7 +149,7 @@ func (s *Server) listItems(w http.ResponseWriter, r *http.Request) {
 	q := r.URL.Query()
 	filter := store.ItemFilter{
 		Status:    store.Status(q.Get("status")),
-		MediaType: media.Type(q.Get("type")),
+		MediaType: store.MediaType(q.Get("type")),
 		Query:     q.Get("q"),
 		Archived:  q.Get("archived") == "true",
 	}
@@ -193,8 +190,8 @@ func (s *Server) getItem(w http.ResponseWriter, r *http.Request) {
 
 func (s *Server) resolveItem(w http.ResponseWriter, r *http.Request) {
 	var req struct {
-		TMDBID    int64      `json:"tmdb_id"`
-		MediaType media.Type `json:"media_type"`
+		TMDBID    int64           `json:"tmdb_id"`
+		MediaType store.MediaType `json:"media_type"`
 	}
 	if !decode(w, r, &req) {
 		return
@@ -233,7 +230,7 @@ func (s *Server) resolveItem(w http.ResponseWriter, r *http.Request) {
 		s.log.Warn("could not clear candidates", "item", it.ID, "error", err)
 	}
 	s.cacheEntity(r.Context(), details)
-	if err := s.engine.RefreshItem(r.Context(), it.ID); err != nil {
+	if err := s.reconciler.RefreshItem(r.Context(), it.ID); err != nil {
 		s.log.Warn("could not compute state after resolve", "item", it.ID, "error", err)
 	}
 
@@ -274,7 +271,7 @@ func (s *Server) sendItem(w http.ResponseWriter, r *http.Request) {
 			writeError(w, http.StatusServiceUnavailable, codeNotConfigured, "nobody has a Radarr configured")
 			return
 		}
-		_, err = target.Client.Add(ctx, int(it.TMDBID), arr.AddOptions{
+		_, err = target.Client.Add(ctx, int(it.TMDBID), integration.AddOptions{
 			QualityProfileID: target.Config.QualityProfileID,
 			RootFolder:       target.Config.RootFolder,
 			Monitor:          true,
@@ -288,14 +285,14 @@ func (s *Server) sendItem(w http.ResponseWriter, r *http.Request) {
 			writeError(w, http.StatusServiceUnavailable, codeNotConfigured, "nobody has a Sonarr configured")
 			return
 		}
-		ids := arr.ExternalIDs{TMDBID: int(it.TMDBID), Title: it.Title, Year: it.Year}
+		ids := integration.ArrExternalIDs{TMDBID: int(it.TMDBID), Title: it.Title, Year: it.Year}
 		// Sonarr keys on TVDB, so the TMDB ID has to be translated first.
 		if catalogue := s.tmdb(); catalogue != nil {
 			if external, idErr := catalogue.ExternalIDs(ctx, it.MediaType, int(it.TMDBID)); idErr == nil {
 				ids.TVDBID, ids.IMDBID = external.TVDBID, external.IMDBID
 			}
 		}
-		_, err = target.Client.Add(ctx, ids, arr.AddOptions{
+		_, err = target.Client.Add(ctx, ids, integration.AddOptions{
 			QualityProfileID: target.Config.QualityProfileID,
 			RootFolder:       target.Config.RootFolder,
 			Monitor:          true,
@@ -319,7 +316,7 @@ func (s *Server) sendItem(w http.ResponseWriter, r *http.Request) {
 	}
 
 	// A title the service already tracks is the outcome the user wanted.
-	if err != nil && !errors.Is(err, arr.ErrAlreadyAdded) {
+	if err != nil && !errors.Is(err, integration.ErrAlreadyAdded) {
 		writeError(w, http.StatusBadGateway, codeUpstreamError, "%s rejected the request: %v", req.Target, err)
 		return
 	}
@@ -327,7 +324,7 @@ func (s *Server) sendItem(w http.ResponseWriter, r *http.Request) {
 		s.writeStoreError(w, err, "item")
 		return
 	}
-	s.engine.Trigger()
+	s.reconciler.Trigger()
 
 	s.respondWithItem(w, r, it.ID)
 }
@@ -404,7 +401,7 @@ func (s *Server) respondWithItem(w http.ResponseWriter, r *http.Request, id int6
 
 // cacheEntity stores TMDB metadata so the item keeps its poster and overview
 // when TMDB is later unreachable. A failure here costs artwork, never data.
-func (s *Server) cacheEntity(ctx context.Context, d *tmdb.Details) {
+func (s *Server) cacheEntity(ctx context.Context, d *integration.Details) {
 	if err := s.store.PutEntity(ctx, store.Entity{
 		TMDBID: int64(d.TMDBID), MediaType: d.Type, Title: d.Title,
 		Year: d.Year, PosterPath: d.PosterPath, BackdropPath: d.BackdropPath,
@@ -417,6 +414,6 @@ func (s *Server) cacheEntity(ctx context.Context, d *tmdb.Details) {
 
 // tmdb builds the catalogue client. TMDB stays global — one key per install —
 // and is nil when no key is set.
-func (s *Server) tmdb() *tmdb.Client {
-	return clients.TMDB(s.settings.Get(), s.store.HTTPCache())
+func (s *Server) tmdb() *integration.TMDBClient {
+	return integration.TMDB(s.settings.Get(), s.store.HTTPCache())
 }

@@ -3,7 +3,6 @@ package api
 import (
 	"time"
 
-	"github.com/sirrobot01/snagarr/internal/media"
 	"github.com/sirrobot01/snagarr/internal/store"
 )
 
@@ -14,36 +13,36 @@ type userRef struct {
 }
 
 type candidateDTO struct {
-	TMDBID     int64      `json:"tmdb_id"`
-	MediaType  media.Type `json:"media_type"`
-	Title      string     `json:"title"`
-	Year       *int       `json:"year"`
-	PosterPath *string    `json:"poster_path"`
-	Overview   *string    `json:"overview"`
-	Score      float64    `json:"score"`
+	TMDBID     int64           `json:"tmdb_id"`
+	MediaType  store.MediaType `json:"media_type"`
+	Title      string          `json:"title"`
+	Year       *int            `json:"year"`
+	PosterPath *string         `json:"poster_path"`
+	Overview   *string         `json:"overview"`
+	Score      float64         `json:"score"`
 }
 
 type itemDTO struct {
-	ID          int64          `json:"id"`
-	TMDBID      *int64         `json:"tmdb_id"`
-	MediaType   media.Type     `json:"media_type"`
-	Title       string         `json:"title"`
-	Year        *int           `json:"year"`
-	PosterPath  *string        `json:"poster_path"`
-	Status      store.Status   `json:"status"`
-	Archived    bool           `json:"archived"`
-	RawInput    string         `json:"raw_input"`
-	Source      store.Source   `json:"source"`
-	SourceURL   *string        `json:"source_url"`
-	Note        *string        `json:"note"`
-	CapturedBy  *userRef       `json:"captured_by"`
-	CapturedAt  time.Time      `json:"captured_at"`
-	ResolvedAt  *time.Time     `json:"resolved_at"`
-	AvailableAt *time.Time     `json:"available_at"`
-	Overview    *string        `json:"overview"`
-	Runtime     *int           `json:"runtime"`
-	Genres      []string       `json:"genres"`
-	Candidates  []candidateDTO `json:"candidates"`
+	ID          int64           `json:"id"`
+	TMDBID      *int64          `json:"tmdb_id"`
+	MediaType   store.MediaType `json:"media_type"`
+	Title       string          `json:"title"`
+	Year        *int            `json:"year"`
+	PosterPath  *string         `json:"poster_path"`
+	Status      store.Status    `json:"status"`
+	Archived    bool            `json:"archived"`
+	RawInput    string          `json:"raw_input"`
+	Source      store.Source    `json:"source"`
+	SourceURL   *string         `json:"source_url"`
+	Note        *string         `json:"note"`
+	CapturedBy  *userRef        `json:"captured_by"`
+	CapturedAt  time.Time       `json:"captured_at"`
+	ResolvedAt  *time.Time      `json:"resolved_at"`
+	AvailableAt *time.Time      `json:"available_at"`
+	Overview    *string         `json:"overview"`
+	Runtime     *int            `json:"runtime"`
+	Genres      []string        `json:"genres"`
+	Candidates  []candidateDTO  `json:"candidates"`
 }
 
 func newItemDTO(it store.Item) itemDTO {
@@ -73,15 +72,15 @@ func newCandidateDTO(c store.Candidate) candidateDTO {
 // searchResult carries the composite state so the UI can badge a row before the
 // user adds it.
 type searchResult struct {
-	TMDBID    int64        `json:"tmdb_id"`
-	MediaType media.Type   `json:"media_type"`
-	Title     string       `json:"title"`
-	Year      *int         `json:"year"`
-	Poster    *string      `json:"poster_path"`
-	Overview  *string      `json:"overview"`
-	State     store.Status `json:"state"`
-	ItemID    *int64       `json:"item_id"`
-	From      string       `json:"from"`
+	TMDBID    int64           `json:"tmdb_id"`
+	MediaType store.MediaType `json:"media_type"`
+	Title     string          `json:"title"`
+	Year      *int            `json:"year"`
+	Poster    *string         `json:"poster_path"`
+	Overview  *string         `json:"overview"`
+	State     store.Status    `json:"state"`
+	ItemID    *int64          `json:"item_id"`
+	From      string          `json:"from"`
 }
 
 // The API distinguishes "absent" from "zero", so absent fields travel as null.

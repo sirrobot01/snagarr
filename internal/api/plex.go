@@ -10,7 +10,7 @@ import (
 
 	"github.com/go-chi/chi/v5"
 
-	"github.com/sirrobot01/snagarr/internal/library"
+	"github.com/sirrobot01/snagarr/internal/integration"
 	"github.com/sirrobot01/snagarr/internal/store"
 	"github.com/sirrobot01/snagarr/internal/version"
 )
@@ -19,10 +19,10 @@ import (
 // survive restarts: regenerating it invalidates every token already granted.
 const plexClientIDKey = "plex_client_id"
 
-func (s *Server) plexAuth(ctx context.Context) (*library.PlexAuth, error) {
+func (s *Server) plexAuth(ctx context.Context) (*integration.PlexAuth, error) {
 	id, err := s.store.Setting(ctx, plexClientIDKey)
 	if err == nil && len(id) > 0 {
-		return library.NewPlexAuth(string(id), version.Version), nil
+		return integration.NewPlexAuth(string(id), version.Version), nil
 	}
 	if err != nil && !errors.Is(err, store.ErrNotFound) {
 		return nil, err
@@ -36,7 +36,7 @@ func (s *Server) plexAuth(ctx context.Context) (*library.PlexAuth, error) {
 	if err := s.store.SetSetting(ctx, plexClientIDKey, []byte(fresh)); err != nil {
 		return nil, err
 	}
-	return library.NewPlexAuth(fresh, version.Version), nil
+	return integration.NewPlexAuth(fresh, version.Version), nil
 }
 
 // createPlexPin starts the plex.tv sign-in flow, so an operator never has to
@@ -72,9 +72,9 @@ func (s *Server) checkPlexPin(w http.ResponseWriter, r *http.Request) {
 
 	token, err := auth.CheckPin(r.Context(), id)
 	switch {
-	case errors.Is(err, library.ErrPinPending):
+	case errors.Is(err, integration.ErrPinPending):
 		writeJSON(w, http.StatusAccepted, map[string]string{"status": "pending"})
-	case errors.Is(err, library.ErrPinExpired):
+	case errors.Is(err, integration.ErrPinExpired):
 		writeError(w, http.StatusGone, codeConflict, "the sign-in expired; start again")
 	case err != nil:
 		writeError(w, http.StatusBadGateway, codeUpstreamError, "plex.tv rejected the request: %v", err)

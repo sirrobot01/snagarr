@@ -159,14 +159,12 @@ export type SettingsPatch = {
 
 /* ── Services ─────────────────────────────────────────────────────────────── */
 
-export type ServiceKind =
-  | 'plex'
-  | 'emby'
-  | 'jellyfin'
-  | 'radarr'
-  | 'sonarr'
-  | 'overseerr'
-  | 'ntfy';
+/** The three media servers differ only in how their client is built. */
+export type LibraryKind = 'plex' | 'emby' | 'jellyfin';
+/** Radarr and Sonarr share every config field except season folders. */
+export type ArrKind = 'radarr' | 'sonarr';
+
+export type ServiceKind = LibraryKind | ArrKind | 'overseerr' | 'ntfy';
 
 /** The union of every kind's config document. Which keys a kind uses is fixed
     by `internal/config/services.go`; the server fills in the rest as defaults. */
@@ -255,6 +253,11 @@ export interface PlexServer {
 /* ── Apple Shortcut ───────────────────────────────────────────────────────── */
 
 export interface ShortcutLink {
+  /** Signed, short-lived, and consumed by the first download. */
   url: string;
+  /** The `shortcuts://import-shortcut/` URL, composed by the server. */
+  import_url: string;
+  /** False when `url` resolves to an address a phone cannot reach. */
+  public: boolean;
   expires_at: string;
 }

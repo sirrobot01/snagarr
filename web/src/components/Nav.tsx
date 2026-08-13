@@ -2,14 +2,17 @@ import { Link, useLocation } from 'wouter';
 import { ThemeToggle } from './ThemeToggle';
 import type { UserRef } from '../lib/types';
 
+/* Settings is on every member's nav: it is where they connect their own Plex
+   and their own Radarr. The install-wide cards inside are still admin-only. */
 const LINKS = [
   { href: '/', label: 'Snag' },
   { href: '/list', label: 'List' },
+  { href: '/settings', label: 'Settings' },
 ];
 
-export function Nav({ me, admin }: { me: UserRef | undefined; admin: boolean }) {
+export function Nav({ me }: { me: UserRef | undefined }) {
   const [location] = useLocation();
-  const links = admin ? [...LINKS, { href: '/settings', label: 'Settings' }] : LINKS;
+  const links = LINKS;
   const other =
     location === '/' ? { href: '/list', label: 'LIST →' } : { href: '/', label: '← SNAG' };
 

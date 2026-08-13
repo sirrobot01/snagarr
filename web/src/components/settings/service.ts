@@ -1,7 +1,7 @@
 import { useMutation, useQuery } from '@tanstack/react-query';
 import { ApiError, api } from '../../lib/api';
 import { keys, useSaveService } from '../../lib/queries';
-import type { Service, ServiceKind, TestResult } from '../../lib/types';
+import type { ArrKind, LibraryKind, Service, ServiceKind, TestResult } from '../../lib/types';
 import type { ServiceDraft } from './draft';
 
 export const KINDS: { value: ServiceKind; label: string }[] = [
@@ -18,12 +18,22 @@ export function kindLabel(kind: ServiceKind): string {
   return KINDS.find((item) => item.value === kind)?.label ?? kind;
 }
 
-export function isLibrary(kind: ServiceKind): boolean {
+export function isLibrary(kind: ServiceKind): kind is LibraryKind {
   return kind === 'plex' || kind === 'emby' || kind === 'jellyfin';
 }
 
-export function isArr(kind: ServiceKind): boolean {
+export function isArr(kind: ServiceKind): kind is ArrKind {
   return kind === 'radarr' || kind === 'sonarr';
+}
+
+/* One name per kind per member is a server-side rule, so the second Radarr gets
+   "Default 2" rather than a 409 the user has to work out for themselves. */
+export function freeName(services: Service[], kind: ServiceKind): string {
+  const taken = new Set(services.filter((s) => s.kind === kind).map((s) => s.name));
+  if (!taken.has('Default')) return 'Default';
+  for (let n = 2; ; n += 1) {
+    if (!taken.has(`Default ${n}`)) return `Default ${n}`;
+  }
 }
 
 /* Mirrors the Configured() methods in internal/config/services.go. The service

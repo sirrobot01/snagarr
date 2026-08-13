@@ -78,7 +78,7 @@ func (s *Server) putSettings(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 	// A new TMDB key usually means captures waiting to be resolved.
-	s.engine.Trigger()
+	s.reconciler.Trigger()
 
 	body, err := s.settingsBody(updated)
 	if err != nil {

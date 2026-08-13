@@ -6,8 +6,6 @@ import (
 	"fmt"
 	"strings"
 	"time"
-
-	"github.com/sirrobot01/snagarr/internal/media"
 )
 
 // TitleKey identifies a title across every index. TMDB is the primary key
@@ -15,7 +13,7 @@ import (
 // the sync that writes them, never at read time.
 type TitleKey struct {
 	TMDBID    int64
-	MediaType media.Type
+	MediaType MediaType
 }
 
 // LibraryEntry mirrors one title held by a media server.
@@ -24,7 +22,7 @@ type LibraryEntry struct {
 	TMDBID         int64
 	IMDBID         string
 	TVDBID         int64
-	MediaType      media.Type
+	MediaType      MediaType
 	Title          string
 	Year           int
 	AddedAt        time.Time
@@ -47,7 +45,7 @@ type ArrEntry struct {
 type RequestEntry struct {
 	RequestID int
 	TMDBID    int64
-	MediaType media.Type
+	MediaType MediaType
 	Status    string
 }
 
@@ -214,9 +212,9 @@ func (s *Store) LoadStateIndex(ctx context.Context) (*StateIndex, error) {
 		}
 		e.TVDBID = tvdb.Int64
 		e.QualityProfileID = int(profile.Int64)
-		t := media.Movie
+		t := Movie
 		if kind == KindSonarr {
-			t = media.TV
+			t = TV
 		}
 		key := TitleKey{TMDBID: e.TMDBID, MediaType: t}
 		// Two members can both track a title. The household answer is the most

@@ -1,5 +1,6 @@
 // Package api exposes the HTTP surface. The API is the product: the web client
 // is one consumer of it, alongside the Shortcut, the bookmarklet and the bot.
+// It also generates the Apple Shortcut it hands out.
 package api
 
 import (
@@ -11,23 +12,23 @@ import (
 	"github.com/go-chi/chi/v5/middleware"
 
 	"github.com/sirrobot01/snagarr/internal/config"
-	"github.com/sirrobot01/snagarr/internal/reconcile"
-	"github.com/sirrobot01/snagarr/internal/resolver"
+	"github.com/sirrobot01/snagarr/internal/engine"
 	"github.com/sirrobot01/snagarr/internal/store"
 )
 
 type Server struct {
-	store    *store.Store
-	settings *config.Manager
-	resolver *resolver.Resolver
-	engine   *reconcile.Engine
-	web      http.Handler
-	log      *slog.Logger
+	store      *store.Store
+	settings   *config.Manager
+	resolver   *engine.Resolver
+	reconciler *engine.Reconciler
+	web        http.Handler
+	log        *slog.Logger
 }
 
-func New(st *store.Store, settings *config.Manager, res *resolver.Resolver,
-	engine *reconcile.Engine, web http.Handler, log *slog.Logger) *Server {
-	return &Server{store: st, settings: settings, resolver: res, engine: engine, web: web, log: log}
+func New(st *store.Store, settings *config.Manager, res *engine.Resolver,
+	reconciler *engine.Reconciler, web http.Handler, log *slog.Logger) *Server {
+	return &Server{store: st, settings: settings, resolver: res, reconciler: reconciler,
+		web: web, log: log}
 }
 
 func (s *Server) Handler() http.Handler {
@@ -119,7 +120,7 @@ func (s *Server) status(w http.ResponseWriter, r *http.Request) {
 	writeJSON(w, http.StatusOK, map[string]any{
 		"version": buildVersion,
 		"counts":  counts,
-		"sync":    s.engine.Status(),
+		"sync":    s.reconciler.Status(),
 		// Household-wide: one member's Radarr answers for everybody, because
 		// the list they all read is a shared one.
 		"services": map[string]bool{
@@ -134,7 +135,7 @@ func (s *Server) status(w http.ResponseWriter, r *http.Request) {
 }
 
 func (s *Server) forceSync(w http.ResponseWriter, _ *http.Request) {
-	s.engine.Trigger()
+	s.reconciler.Trigger()
 	writeJSON(w, http.StatusAccepted, map[string]string{"status": "queued"})
 }
 

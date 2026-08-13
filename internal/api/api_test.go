@@ -14,9 +14,7 @@ import (
 	"testing"
 
 	"github.com/sirrobot01/snagarr/internal/config"
-	"github.com/sirrobot01/snagarr/internal/media"
-	"github.com/sirrobot01/snagarr/internal/reconcile"
-	"github.com/sirrobot01/snagarr/internal/resolver"
+	"github.com/sirrobot01/snagarr/internal/engine"
 	"github.com/sirrobot01/snagarr/internal/store"
 )
 
@@ -44,8 +42,8 @@ func newHarness(t *testing.T) *harness {
 		t.Fatalf("settings: %v", err)
 	}
 	log := slog.New(slog.NewTextHandler(io.Discard, nil))
-	engine := reconcile.New(db, settings, log)
-	handler := New(db, settings, resolver.New(db, log), engine,
+	reconciler := engine.NewReconciler(db, settings, log)
+	handler := New(db, settings, engine.NewResolver(db, log), reconciler,
 		http.NotFoundHandler(), log).Handler()
 
 	h := &harness{store: db, server: httptest.NewServer(handler)}
@@ -195,14 +193,14 @@ func TestItemOwnershipRules(t *testing.T) {
 
 	adminItem := &store.Item{
 		Title: "Nosferatu", RawInput: "nosferatu", Status: store.StatusNew,
-		Source: store.SourceWeb, TMDBID: 426063, MediaType: media.Movie, CapturedBy: h.admin.ID,
+		Source: store.SourceWeb, TMDBID: 426063, MediaType: store.Movie, CapturedBy: h.admin.ID,
 	}
 	if err := h.store.CreateItem(ctx, adminItem); err != nil {
 		t.Fatalf("seed: %v", err)
 	}
 	memberItem := &store.Item{
 		Title: "Severance", RawInput: "severance", Status: store.StatusNew,
-		Source: store.SourceTelegram, TMDBID: 95396, MediaType: media.TV, CapturedBy: h.member.ID,
+		Source: store.SourceTelegram, TMDBID: 95396, MediaType: store.TV, CapturedBy: h.member.ID,
 	}
 	if err := h.store.CreateItem(ctx, memberItem); err != nil {
 		t.Fatalf("seed: %v", err)
@@ -230,7 +228,7 @@ func TestListFiltersArchivedItems(t *testing.T) {
 
 	it := &store.Item{
 		Title: "Past Lives", RawInput: "past lives", Status: store.StatusAvailable,
-		Source: store.SourceWeb, TMDBID: 666277, MediaType: media.Movie, CapturedBy: h.admin.ID,
+		Source: store.SourceWeb, TMDBID: 666277, MediaType: store.Movie, CapturedBy: h.admin.ID,
 	}
 	if err := h.store.CreateItem(ctx, it); err != nil {
 		t.Fatalf("seed: %v", err)
@@ -513,7 +511,7 @@ func TestMemberSendsOnlyToOwnServices(t *testing.T) {
 
 	it := &store.Item{
 		Title: "Anora", RawInput: "anora", Status: store.StatusNew, Source: store.SourceWeb,
-		TMDBID: 1064213, MediaType: media.Movie, CapturedBy: h.member.ID,
+		TMDBID: 1064213, MediaType: store.Movie, CapturedBy: h.member.ID,
 	}
 	if err := h.store.CreateItem(ctx, it); err != nil {
 		t.Fatalf("seed item: %v", err)

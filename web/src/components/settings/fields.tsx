@@ -110,6 +110,31 @@ export function Seg<T extends string>({ name, value, options, onChange, locked }
   );
 }
 
+interface CheckFieldProps {
+  id: string;
+  label: string;
+  checked: boolean;
+  onChange: (checked: boolean) => void;
+  locked?: boolean;
+}
+
+export function CheckField({ id, label, checked, onChange, locked }: CheckFieldProps) {
+  return (
+    <label htmlFor={id} className="flex cursor-pointer items-center gap-2 text-[13px]" style={CONTROL}>
+      <input
+        id={id}
+        type="checkbox"
+        className="h-[18px] w-[18px]"
+        style={{ accentColor: 'var(--color-accent)' }}
+        checked={checked}
+        disabled={locked}
+        onChange={(event) => onChange(event.target.checked)}
+      />
+      {locked ? `${label} · LOCKED` : label}
+    </label>
+  );
+}
+
 export function CopyField({ id, label, value }: { id: string; label: string; value: string }) {
   return (
     <div className="field">

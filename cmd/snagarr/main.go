@@ -17,9 +17,8 @@ import (
 
 	"github.com/sirrobot01/snagarr/internal/api"
 	"github.com/sirrobot01/snagarr/internal/config"
-	"github.com/sirrobot01/snagarr/internal/httpx"
-	"github.com/sirrobot01/snagarr/internal/reconcile"
-	"github.com/sirrobot01/snagarr/internal/resolver"
+	"github.com/sirrobot01/snagarr/internal/engine"
+	"github.com/sirrobot01/snagarr/internal/integration"
 	"github.com/sirrobot01/snagarr/internal/store"
 	"github.com/sirrobot01/snagarr/internal/version"
 	"github.com/sirrobot01/snagarr/internal/web"
@@ -62,7 +61,7 @@ func serve(args []string) error {
 	log := slog.New(slog.NewTextHandler(os.Stdout, &slog.HandlerOptions{Level: cfg.LogLevel}))
 	slog.SetDefault(log)
 
-	httpx.UserAgent = version.UserAgent()
+	integration.UserAgent = version.UserAgent()
 	api.SetVersion(version.Version)
 
 	key, err := cfg.SecretKey()
@@ -92,10 +91,10 @@ func serve(args []string) error {
 		return err
 	}
 
-	engine := reconcile.New(db, settings, log)
-	server := api.New(db, settings, resolver.New(db, log), engine, web.Handler(), log)
+	reconciler := engine.NewReconciler(db, settings, log)
+	server := api.New(db, settings, engine.NewResolver(db, log), reconciler, web.Handler(), log)
 
-	go engine.Start(ctx)
+	go reconciler.Start(ctx)
 
 	httpServer := &http.Server{
 		Addr:              cfg.Addr,

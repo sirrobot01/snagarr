@@ -8,8 +8,6 @@ import (
 	"fmt"
 	"strings"
 	"time"
-
-	"github.com/sirrobot01/snagarr/internal/media"
 )
 
 // Status is an item's composite state. Everything except needs_review is
@@ -44,7 +42,7 @@ const (
 type Item struct {
 	ID          int64
 	TMDBID      int64
-	MediaType   media.Type
+	MediaType   MediaType
 	Title       string
 	Year        int
 	PosterPath  string
@@ -75,7 +73,7 @@ func (i *Item) Archived() bool { return !i.ArchivedAt.IsZero() }
 // ambiguous capture is never lost.
 type Candidate struct {
 	TMDBID     int64
-	MediaType  media.Type
+	MediaType  MediaType
 	Title      string
 	Year       int
 	PosterPath string
@@ -87,7 +85,7 @@ type Candidate struct {
 // except Archived, which defaults to hiding archived items.
 type ItemFilter struct {
 	Status     Status
-	MediaType  media.Type
+	MediaType  MediaType
 	Query      string
 	CapturedBy int64
 	Archived   bool
@@ -169,7 +167,7 @@ func (s *Store) Item(ctx context.Context, id int64) (*Item, error) {
 
 // ItemByTMDB backs capture idempotency: snagging a title that is already on the
 // list returns the existing item instead of creating a duplicate.
-func (s *Store) ItemByTMDB(ctx context.Context, tmdbID int64, t media.Type) (*Item, error) {
+func (s *Store) ItemByTMDB(ctx context.Context, tmdbID int64, t MediaType) (*Item, error) {
 	it, err := scanItem(s.db.QueryRowContext(ctx,
 		`SELECT `+itemColumns+itemFrom+` WHERE i.tmdb_id = ? AND i.media_type = ?`, tmdbID, t))
 	if errors.Is(err, sql.ErrNoRows) {

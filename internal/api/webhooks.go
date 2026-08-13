@@ -8,7 +8,7 @@ import (
 
 	"github.com/go-chi/chi/v5"
 
-	"github.com/sirrobot01/snagarr/internal/media"
+	"github.com/sirrobot01/snagarr/internal/store"
 )
 
 // Webhooks always answer 204, including for payloads that match nothing. A
@@ -63,15 +63,15 @@ func (s *Server) handleImport(r *http.Request, service string, body []byte) {
 		return
 	}
 
-	tmdbID, mediaType := int64(event.Movie.TMDBID), media.Movie
+	tmdbID, mediaType := int64(event.Movie.TMDBID), store.Movie
 	if service == "sonarr" {
-		tmdbID, mediaType = int64(event.Series.TMDBID), media.TV
+		tmdbID, mediaType = int64(event.Series.TMDBID), store.TV
 	}
 	if tmdbID == 0 {
 		s.log.Debug("webhook carried no tmdb id", "service", service, "event", event.EventType)
 		return
 	}
-	if err := s.engine.MarkAvailable(r.Context(), tmdbID, mediaType); err != nil {
+	if err := s.reconciler.MarkAvailable(r.Context(), tmdbID, mediaType); err != nil {
 		s.log.Warn("could not apply import webhook", "service", service, "error", err)
 	}
 }
@@ -99,9 +99,9 @@ func (s *Server) handlePlayback(r *http.Request, service string, body []byte) {
 	}
 
 	tmdbID := parseTMDBID(event.TMDBID)
-	mediaType := media.Movie
+	mediaType := store.Movie
 	if event.MediaType == "show" || event.MediaType == "episode" || event.Item.Type == "Episode" || event.Item.Type == "Series" {
-		mediaType = media.TV
+		mediaType = store.TV
 	}
 	if tmdbID == 0 {
 		for name, value := range event.Item.ProviderIDs {
@@ -116,7 +116,7 @@ func (s *Server) handlePlayback(r *http.Request, service string, body []byte) {
 		return
 	}
 
-	if err := s.engine.MarkWatched(r.Context(), tmdbID, mediaType, service); err != nil {
+	if err := s.reconciler.MarkWatched(r.Context(), tmdbID, mediaType, service); err != nil {
 		s.log.Warn("could not apply playback webhook", "service", service, "error", err)
 	}
 }

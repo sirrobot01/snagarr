@@ -68,24 +68,26 @@ function Shell() {
   return (
     <div className="sg-shell">
       <OfflineBanner unreachable={unreachable} />
-      <Nav me={me.data} admin={admin} />
+      <Nav me={me.data} />
 
       <main className="sg-col flex-1">
         <ErrorBoundary>
-        <Suspense fallback={<Loading />}>
-          <Switch>
-            <Route path="/" component={Snag} />
-            <Route path="/list" component={List} />
-            {admin && <Route path="/settings" component={Settings} />}
-            <Route path="/setup" component={Setup} />
-            <Route>
-              <div className="sg-pad py-8">
-                <h3>Not found</h3>
-                <p className="text-muted text-[13px]">That screen does not exist.</p>
-              </div>
-            </Route>
-          </Switch>
-        </Suspense>
+          <Suspense fallback={<Loading />}>
+            <Switch>
+              <Route path="/" component={Snag} />
+              <Route path="/list" component={List} />
+              {/* Every member owns services now, so settings is not admin-only.
+                  The page itself hides the install-wide cards from a member. */}
+              <Route path="/settings" component={Settings} />
+              {admin && <Route path="/setup" component={Setup} />}
+              <Route>
+                <div className="sg-pad py-8">
+                  <h3>Not found</h3>
+                  <p className="text-muted text-[13px]">That screen does not exist.</p>
+                </div>
+              </Route>
+            </Switch>
+          </Suspense>
         </ErrorBoundary>
       </main>
 

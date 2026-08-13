@@ -7,15 +7,13 @@ import (
 	"errors"
 	"fmt"
 	"time"
-
-	"github.com/sirrobot01/snagarr/internal/media"
 )
 
 // Entity is the cached TMDB metadata for one title. Snagged and library titles
 // are always cached, so the list keeps working when TMDB is unreachable.
 type Entity struct {
 	TMDBID       int64
-	MediaType    media.Type
+	MediaType    MediaType
 	Title        string
 	Year         int
 	PosterPath   string
@@ -50,7 +48,7 @@ func (s *Store) PutEntity(ctx context.Context, e Entity) error {
 	return nil
 }
 
-func (s *Store) Entity(ctx context.Context, tmdbID int64, t media.Type) (*Entity, error) {
+func (s *Store) Entity(ctx context.Context, tmdbID int64, t MediaType) (*Entity, error) {
 	var e Entity
 	var year, runtime sql.NullInt64
 	var poster, backdrop, overview, genres sql.NullString
