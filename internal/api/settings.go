@@ -6,17 +6,62 @@ import (
 	"errors"
 	"io"
 	"net/http"
+	"strings"
 
 	"github.com/sirrobot01/snagarr/internal/arr"
+	"github.com/sirrobot01/snagarr/internal/config"
 )
 
 // getSettings returns the live settings with every secret masked. The client
 // echoes masked values back unchanged, and the manager restores the real ones.
 func (s *Server) getSettings(w http.ResponseWriter, r *http.Request) {
-	writeJSON(w, http.StatusOK, map[string]any{
-		"settings": s.settings.Get().Masked(),
-		"locked":   s.settings.Locked(),
-	})
+	body, err := s.settingsBody(s.settings.Get())
+	if err != nil {
+		s.log.Error("could not encode settings", "error", err)
+		writeError(w, http.StatusInternalServerError, codeInternal, "settings could not be read")
+		return
+	}
+	writeJSON(w, http.StatusOK, body)
+}
+
+// settingsBody decorates each section with the two flags the settings UI needs:
+// whether it has enough to work, and whether an environment variable pins it.
+//
+// Locking is reported per section rather than per field. An operator who pins
+// one value of a service almost always pins the rest, and a half-editable card
+// is worse than a read-only one.
+func (s *Server) settingsBody(settings config.Settings) (map[string]any, error) {
+	raw, err := json.Marshal(settings.Masked())
+	if err != nil {
+		return nil, err
+	}
+	var sections map[string]map[string]any
+	if err := json.Unmarshal(raw, &sections); err != nil {
+		return nil, err
+	}
+
+	configured := map[string]bool{
+		"tmdb":      settings.TMDB.Configured(),
+		"library":   settings.Library.Configured(),
+		"radarr":    settings.Radarr.Configured(),
+		"sonarr":    settings.Sonarr.Configured(),
+		"overseerr": settings.Overseerr.Configured(),
+		"ntfy":      settings.Ntfy.Configured(),
+		"telegram":  settings.Telegram.Configured(),
+	}
+	locked := map[string]bool{}
+	for path := range s.settings.Locked() {
+		section, _, _ := strings.Cut(path, ".")
+		locked[section] = true
+	}
+
+	body := make(map[string]any, len(sections))
+	for name, section := range sections {
+		section["configured"] = configured[name]
+		section["locked"] = locked[name]
+		body[name] = section
+	}
+	return body, nil
 }
 
 func (s *Server) putSettings(w http.ResponseWriter, r *http.Request) {
@@ -38,10 +83,13 @@ func (s *Server) putSettings(w http.ResponseWriter, r *http.Request) {
 	// New credentials usually mean new indexes to build.
 	s.engine.Trigger()
 
-	writeJSON(w, http.StatusOK, map[string]any{
-		"settings": updated.Masked(),
-		"locked":   s.settings.Locked(),
-	})
+	body, err := s.settingsBody(updated)
+	if err != nil {
+		s.log.Error("could not encode settings", "error", err)
+		writeError(w, http.StatusInternalServerError, codeInternal, "settings could not be read")
+		return
+	}
+	writeJSON(w, http.StatusOK, body)
 }
 
 // testService reports a service's reachability verbatim, so the settings card

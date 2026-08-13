@@ -266,20 +266,24 @@ func TestSettingsMaskSecrets(t *testing.T) {
 		t.Fatalf("PUT /settings = %d, want 200", resp.StatusCode)
 	}
 
-	type settingsResponse struct {
-		Settings config.Settings `json:"settings"`
-	}
-	got := decodeBody[settingsResponse](t, resp)
-	if got.Settings.TMDB.APIKey == "super-secret-4e2a" {
+	got := decodeBody[map[string]map[string]any](t, resp)
+	masked, _ := got["tmdb"]["api_key"].(string)
+	if masked == "super-secret-4e2a" {
 		t.Error("the API key came back in clear text")
 	}
-	if !config.IsMasked(got.Settings.TMDB.APIKey) {
-		t.Errorf("api_key = %q, want it masked", got.Settings.TMDB.APIKey)
+	if !config.IsMasked(masked) {
+		t.Errorf("api_key = %q, want it masked", masked)
+	}
+	if configured, _ := got["tmdb"]["configured"].(bool); !configured {
+		t.Error("tmdb.configured = false after setting a key")
+	}
+	if _, ok := got["radarr"]["locked"]; !ok {
+		t.Error("sections carry no locked flag; the settings UI needs it")
 	}
 
 	// Echoing the mask back must not overwrite the stored secret.
 	resp = h.do(t, http.MethodPut, "/api/v1/settings", h.adminToken, map[string]any{
-		"tmdb": map[string]any{"api_key": got.Settings.TMDB.APIKey},
+		"tmdb": map[string]any{"api_key": masked},
 	})
 	if resp.StatusCode != http.StatusOK {
 		t.Fatalf("second PUT /settings = %d, want 200", resp.StatusCode)

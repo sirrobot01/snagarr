@@ -140,7 +140,12 @@ func bootstrapAdmin(ctx context.Context, db *store.Store, settings *config.Manag
 
 	base := settings.Get().General.PublicURL
 	if base == "" {
-		base = "http://localhost" + cfg.Addr
+		// Addr is usually just ":8080", which needs a host to be clickable.
+		host := cfg.Addr
+		if strings.HasPrefix(host, ":") {
+			host = "localhost" + host
+		}
+		base = "http://" + host
 	}
 	log.Info("created the admin user")
 	fmt.Printf("\n  Snagarr is ready. Open the setup URL to finish:\n\n    %s/#token=%s\n\n  Admin token: %s\n  Keep it safe — it is not shown again.\n\n",

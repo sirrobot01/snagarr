@@ -56,23 +56,31 @@ func New(s *store.Store, settings *config.Manager, log *slog.Logger) *Engine {
 	return e
 }
 
-// Status reports what the UI shows in the footer and on the settings page.
+// Status reports what the UI shows in the footer and on the settings page. A
+// sync that has never run reports null rather than the zero time.
 type Status struct {
-	LibraryAt    time.Time `json:"library_at"`
-	ArrAt        time.Time `json:"arr_at"`
-	CollectionAt time.Time `json:"collection_at"`
-	Running      bool      `json:"running"`
+	LibraryAt    *time.Time `json:"library_at"`
+	ArrAt        *time.Time `json:"arr_at"`
+	CollectionAt *time.Time `json:"collection_at"`
+	Running      bool       `json:"running"`
 }
 
 func (e *Engine) Status() Status {
 	e.mu.Lock()
 	defer e.mu.Unlock()
 	return Status{
-		LibraryAt:    e.state.LibraryAt,
-		ArrAt:        e.state.ArrAt,
-		CollectionAt: e.state.CollectionAt,
+		LibraryAt:    syncedAt(e.state.LibraryAt),
+		ArrAt:        syncedAt(e.state.ArrAt),
+		CollectionAt: syncedAt(e.state.CollectionAt),
 		Running:      e.running.Load(),
 	}
+}
+
+func syncedAt(t time.Time) *time.Time {
+	if t.IsZero() {
+		return nil
+	}
+	return &t
 }
 
 // Trigger asks for a pass without blocking. A pass already in flight absorbs

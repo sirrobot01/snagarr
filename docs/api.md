@@ -28,11 +28,14 @@ Tautulli and Emby cannot all set headers.
 
 ## Roles
 
-`admin` may do everything. `member` may capture, read, and resolve items they
-captured. These actions are admin-only:
+`admin` may do everything. A `member` may capture, read, and act on the items
+they captured themselves — resolve, archive and delete. That last one is what
+makes the undo toast work for every user.
+
+These actions are admin-only:
 
 - send an item to Radarr, Sonarr or Overseerr
-- archive or delete an item another user captured
+- resolve, archive or delete an item **another** user captured
 - read or write settings, users and tokens
 - force a reconcile
 
@@ -117,18 +120,33 @@ interface SearchResult {
 
 ### `POST /capture`
 
+One endpoint, two paths. `source` defaults to `api` on both.
+
+**Exact identity — the search-result path.** Send `tmdb_id` and `media_type`:
+
 ```json
-{ "query": "sinners", "source": "web", "note": null, "source_url": null }
+{ "tmdb_id": 1233413, "media_type": "movie", "source": "web", "query": "sinn" }
 ```
 
-Send either `query` or `url`, not both. `source` defaults to `api`.
+The server resolves inline and returns a finished item: `201 Created` for a new
+item, or `200 OK` with the existing one if that title is already snagged.
+Capture is idempotent per TMDB ID. Send the typed text as `query` when you have
+it — it is kept as `raw_input` for context.
 
-Responds `202 Accepted` with the created item. Resolution runs asynchronously,
-so the item usually comes back with `status: "needs_review"` and the raw input
-as its title. Poll `GET /items/{id}` or refetch the list.
+**Free text or a link — the everything-else path.** Send `query` or `url`:
 
-When the query resolves to a title that is already snagged, the existing item is
-returned with `200 OK` instead — capture is idempotent per TMDB ID.
+```json
+{ "query": "that vampire one w/ dafoe", "source": "telegram" }
+```
+
+Responds `202 Accepted` immediately with a `needs_review` item whose title is
+the raw input. Resolution runs in the background: known links (TMDB, IMDB)
+resolve by ID, other pages are scraped for hints, and free text goes to TMDB
+search with confidence scoring. Poll `GET /items/{id}` or refetch the list.
+
+A capture is never rejected for being unidentifiable. Anything the resolver
+cannot settle stays `needs_review` with its candidates attached and the raw
+input intact.
 
 ### `GET /search?q=&limit=`
 
@@ -183,9 +201,10 @@ using the configured quality profile and root folder, then sets the item to
 Archiving hides an item from the default list but keeps its history. Members may
 only archive items they captured.
 
-### `DELETE /items/{id}` — admin
+### `DELETE /items/{id}`
 
-Removes the item and its candidates. `204 No Content`.
+Removes the item and its candidates. `204 No Content`. A member may delete an
+item they captured; deleting another member's item needs admin.
 
 ## Users and tokens — admin
 
@@ -267,12 +286,23 @@ value sent back unchanged in a `PUT` leaves the stored secret alone.
 }
 ```
 
-Fields set through environment variables are additionally marked
-`"locked": true` and the UI renders them read-only.
+Every section carries two flags. `configured` reports whether the section holds
+enough to work. `locked` is true when an environment variable pins any value in
+that section; the UI then renders the whole card read-only, because a value
+edited there would be overwritten on the next restart.
+
+Locking is reported per section, not per field — an operator who pins one value
+of a service almost always pins the rest, and a half-editable card is worse than
+a read-only one.
 
 ### `PUT /settings`
 
-Accepts a partial object of the same shape. Returns the full settings.
+Accepts a partial object of the same shape and merges it over the current
+values: any field you omit keeps what it had. Returns the full settings.
+
+Send a masked secret back unchanged to leave the stored value alone. The
+`configured` and `locked` flags are ignored on the way in, so a client may echo
+a whole `GET /settings` response.
 
 ### `POST /settings/test`
 
@@ -309,10 +339,12 @@ Drives the footer strip and the settings page.
   "version": "0.1.0",
   "counts": { "total": 24, "ready": 6, "pending": 15, "needs_review": 3, "archived": 2 },
   "sync": { "library_at": "…", "arr_at": "…", "collection_at": "…", "running": false },
-  "services": { "tmdb": true, "library": true, "radarr": true,
-                "sonarr": true, "overseerr": false, "ntfy": true }
+  "services": { "tmdb": true, "library": true, "radarr": true, "sonarr": true,
+                "overseerr": false, "ntfy": true, "telegram": false }
 }
 ```
+
+A sync that has never run reports `null` for its timestamp.
 
 ### `POST /admin/sync` — admin
 

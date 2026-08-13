@@ -1,0 +1,341 @@
+/* Modernist — design-system tokens and component classes.
+   Source of truth for the Snagarr look.
+
+   Dark is the native ground (PRD §10.1.5): media tools sit next to TVs, and a
+   dark page stops the chrome competing with poster art. Light is available
+   through [data-theme="light"]. An inline script in index.html stamps the
+   attribute before first paint from localStorage, falling back to
+   prefers-color-scheme, so there is no flash and no duplicated token block.
+
+   The palette ramps are absolute and never swap. Only the semantic tokens
+   below them change per theme.
+
+   Archivo is vendored through @fontsource/archivo — the binary serves every
+   asset itself and never calls out to Google Fonts. */
+
+:root {
+  /* ── Palette — absolute, theme-independent ───────────────────────────── */
+  --color-neutral-100: #f8f4f4;
+  --color-neutral-200: #eae7e7;
+  --color-neutral-300: #d7d3d3;
+  --color-neutral-400: #bab6b6;
+  --color-neutral-500: #9b9797;
+  --color-neutral-600: #7d7979;
+  --color-neutral-700: #605d5d;
+  --color-neutral-800: #444141;
+  --color-neutral-900: #2d2b2b;
+  --color-ink: #201e1d;
+  --color-paper: #f3f2f2;
+
+  --color-accent-100: #fff2ef;
+  --color-accent-200: #ffe0d9;
+  --color-accent-300: #ffc4b8;
+  --color-accent-400: #ff9783;
+  --color-accent-500: #ff563c;
+  --color-accent-600: #ec3013;
+  --color-accent-700: #dd2b0f;
+  --color-accent-800: #7c1405;
+  --color-accent-900: #4d170e;
+
+  /* ── Type ────────────────────────────────────────────────────────────── */
+  --font-heading: "Archivo", system-ui, sans-serif;
+  --font-heading-weight: 800;
+  --font-body: "Archivo", system-ui, sans-serif;
+
+  /* ── Space & radius — the system is square by design ─────────────────── */
+  --space-1: 4px;
+  --space-2: 8px;
+  --space-3: 12px;
+  --space-4: 16px;
+  --space-6: 24px;
+  --space-8: 32px;
+  --radius-sm: 0px;
+  --radius-md: 0px;
+  --radius-lg: 0px;
+
+  /* ── Semantic tokens — dark ground ───────────────────────────────────── */
+  --color-bg: var(--color-ink);
+  --color-surface: var(--color-neutral-900);
+  --color-text: var(--color-paper);
+  /* 55% over the dark ground clears 4.5:1 — the floor for the 9-12px
+     uppercase labels this system leans on. */
+  --color-muted: color-mix(in srgb, var(--color-text) 55%, transparent);
+  --color-accent: var(--color-accent-500);
+  --color-accent-hover: var(--color-accent-400);
+  --color-accent-active: var(--color-accent-300);
+  --color-divider: var(--color-neutral-700);
+  --color-line: var(--color-neutral-800);
+  --color-hover: color-mix(in srgb, var(--color-text) 8%, transparent);
+
+  --shadow-sm: 0 1px 2px rgb(0 0 0 / 0.5);
+  --shadow-md: 0 3px 10px rgb(0 0 0 / 0.55);
+  --shadow-lg: 0 12px 32px rgb(0 0 0 / 0.6);
+
+  /* Badge roles — one badge per row, ranked by weight, not hue.
+     solid light = owned · outline = in flight · tint = requested
+     solid accent = needs you · hairline = new */
+  --badge-library-bg: var(--color-paper);
+  --badge-library-fg: var(--color-ink);
+  --badge-monitored-border: var(--color-accent-500);
+  --badge-monitored-fg: var(--color-accent-400);
+  --badge-requested-bg: var(--color-accent-800);
+  --badge-requested-fg: var(--color-accent-300);
+  --badge-review-bg: var(--color-accent-500);
+  --badge-review-fg: var(--color-ink);
+  --badge-new-border: var(--color-neutral-700);
+  --badge-new-fg: var(--color-neutral-500);
+
+  color-scheme: dark;
+}
+
+:root[data-theme="light"] {
+  --color-bg: var(--color-paper);
+  --color-surface: #eae9e9;
+  --color-text: var(--color-ink);
+  /* 65% over paper — the design's 45%/50% greys land near 2.7:1 and fail AA
+     at 9-12px, so the muted role is darkened to clear the floor. */
+  --color-muted: color-mix(in srgb, var(--color-text) 65%, transparent);
+  --color-accent: var(--color-accent-600);
+  --color-accent-hover: var(--color-accent-700);
+  --color-accent-active: #ae1800;
+  --color-divider: color-mix(in srgb, var(--color-ink) 40%, transparent);
+  --color-line: color-mix(in srgb, var(--color-ink) 25%, transparent);
+  --color-hover: color-mix(in srgb, var(--color-text) 6%, transparent);
+
+  --shadow-sm: 0 1px 2px color-mix(in srgb, var(--color-neutral-900) 14%, transparent);
+  --shadow-md: 0 3px 10px color-mix(in srgb, var(--color-neutral-900) 16%, transparent);
+  --shadow-lg: 0 12px 32px color-mix(in srgb, var(--color-neutral-900) 22%, transparent);
+
+  --badge-library-bg: var(--color-ink);
+  --badge-library-fg: var(--color-paper);
+  --badge-monitored-border: var(--color-accent-600);
+  --badge-monitored-fg: #ae1800;
+  --badge-requested-bg: var(--color-accent-200);
+  --badge-requested-fg: var(--color-accent-800);
+  --badge-review-bg: var(--color-accent-600);
+  --badge-review-fg: var(--color-paper);
+  --badge-new-border: color-mix(in srgb, var(--color-ink) 30%, transparent);
+  --badge-new-fg: color-mix(in srgb, var(--color-ink) 65%, transparent);
+
+  color-scheme: light;
+}
+
+/* ══════════════════════════════════════════════════════════════════════════
+   Base
+   ══════════════════════════════════════════════════════════════════════ */
+
+*, *::before, *::after { box-sizing: border-box; }
+
+body {
+  margin: 0;
+  background: var(--color-bg);
+  color: var(--color-text);
+  font-family: var(--font-body);
+  font-size: 15px;
+  line-height: 1.55;
+  -webkit-font-smoothing: antialiased;
+}
+
+h1, h2, h3, h4, h5, h6 {
+  font-family: var(--font-heading); font-weight: var(--font-heading-weight);
+  line-height: 1.12; letter-spacing: -0.015em; margin: 0 0 var(--space-2);
+}
+h1 { font-size: 42px; }
+h2 { font-size: 32px; }
+h3 { font-size: 25px; }
+h4 { font-size: 20px; }
+h5 { font-size: 16px; }
+h6 { font-size: 13px; letter-spacing: 0.08em; text-transform: uppercase; }
+p { margin: 0 0 var(--space-3); }
+a { color: var(--color-accent); text-underline-offset: 3px; }
+img { display: block; max-width: 100%; }
+
+.text-muted { color: var(--color-muted); }
+:focus { outline: none; }
+:focus-visible { outline: 2px solid var(--color-accent); outline-offset: 2px; }
+::selection { background: color-mix(in srgb, var(--color-accent) 30%, transparent); }
+
+.hr { height: 2px; border: 0; margin: var(--space-4) 0; background: var(--color-divider); }
+
+/* ══════════════════════════════════════════════════════════════════════════
+   Components
+   ══════════════════════════════════════════════════════════════════════ */
+
+.btn {
+  display: inline-flex; align-items: center; justify-content: center; gap: 6px;
+  cursor: pointer; text-decoration: none;
+  font-family: var(--font-heading); font-weight: var(--font-heading-weight);
+  font-size: 14px; line-height: 1.2; color: var(--color-text);
+  background: transparent; border: 1px solid transparent;
+  padding: var(--space-2) calc(var(--space-3) * 1.2);
+  border-radius: var(--radius-md);
+}
+.btn svg { display: block; }
+.btn:disabled { opacity: 0.45; cursor: not-allowed; }
+.btn-primary { background: var(--color-accent); color: var(--color-bg); }
+.btn-primary:hover:not(:disabled) { background: var(--color-accent-hover); }
+.btn-primary:active:not(:disabled) { background: var(--color-accent-active); }
+.btn-secondary { border-color: var(--color-divider); }
+.btn-secondary:hover:not(:disabled) { background: var(--color-hover); }
+.btn-secondary:active:not(:disabled) { background: color-mix(in srgb, var(--color-text) 14%, transparent); }
+.btn-ghost { color: var(--color-accent); padding-inline: var(--space-1); }
+.btn-ghost:hover:not(:disabled) { background: color-mix(in srgb, var(--color-accent) 12%, transparent); }
+.btn-danger { color: var(--color-accent); border-color: var(--color-divider); }
+.btn-icon { width: 36px; height: 36px; padding: 0; }
+.btn-block { width: 100%; margin-top: var(--space-2); justify-content: flex-start; text-align: left; }
+
+.field > label {
+  display: block; font-size: 12px; margin-bottom: 5px; color: var(--color-muted);
+}
+.input {
+  width: 100%; min-height: 36px; padding: 6px 10px; font: inherit;
+  font-size: 14px; color: var(--color-text); caret-color: var(--color-accent);
+  background: var(--color-surface);
+  border: 1px solid var(--color-divider); border-radius: var(--radius-md);
+}
+.input:hover { border-color: color-mix(in srgb, var(--color-text) 45%, transparent); }
+.input:focus-visible { border-color: var(--color-accent); outline-offset: 0; }
+.input[aria-invalid="true"] { border-color: var(--color-accent); }
+textarea.input { min-height: 90px; resize: vertical; }
+
+.seg {
+  display: inline-flex; overflow: hidden;
+  border: 1px solid var(--color-divider); border-radius: var(--radius-md);
+}
+.seg-opt { display: inline-flex; align-items: center; gap: 6px; padding: 7px 12px; font-size: 13px; cursor: pointer; }
+.seg-opt input { position: absolute; opacity: 0; width: 0; height: 0; pointer-events: none; }
+.seg-opt + .seg-opt { border-left: 1px solid var(--color-divider); }
+.seg-opt:has(input:checked) { background: var(--color-accent); color: var(--color-bg); }
+.seg-opt:not(:has(input:checked)):hover { background: var(--color-hover); }
+.seg-opt:has(input:focus-visible) { outline: 2px solid var(--color-accent); outline-offset: -2px; }
+
+.elev-sm { box-shadow: var(--shadow-sm); }
+.elev-md { box-shadow: var(--shadow-md); }
+.elev-lg { box-shadow: var(--shadow-lg); }
+
+.nav {
+  display: flex; align-items: center; gap: var(--space-4);
+  padding: var(--space-3) var(--space-4);
+  border-bottom: 2px solid var(--color-divider);
+}
+.nav-brand {
+  font-family: var(--font-heading); font-weight: var(--font-heading-weight);
+  font-size: 18px; margin-right: auto; letter-spacing: -0.02em;
+}
+.nav a { color: inherit; text-decoration: none; font-size: 14px; }
+.nav a:hover, .nav a[aria-current='page'] { color: var(--color-accent); }
+
+.table { width: 100%; border-collapse: collapse; font-size: 14px; }
+.table th {
+  text-align: left; font-size: 11px; letter-spacing: 0.08em; text-transform: uppercase;
+  color: var(--color-muted);
+  padding: var(--space-2); border-bottom: 2px solid var(--color-divider);
+}
+.table td { padding: var(--space-2); border-bottom: 1px solid var(--color-line); }
+.table tbody tr:hover { background: var(--color-hover); }
+
+.dialog-backdrop {
+  position: fixed; inset: 0; z-index: 50; display: grid; place-items: center;
+  padding: var(--space-4);
+  background: color-mix(in srgb, #000 60%, transparent);
+}
+.dialog {
+  width: min(440px, 100%); display: flex; flex-direction: column;
+  background: var(--color-bg); border: 2px solid var(--color-divider);
+  box-shadow: var(--shadow-lg);
+}
+.dialog-title { font-family: var(--font-heading); font-weight: var(--font-heading-weight); font-size: 20px; }
+.dialog-actions { display: flex; justify-content: flex-end; gap: var(--space-2); }
+
+/* ══════════════════════════════════════════════════════════════════════════
+   Snagarr — the product layer
+   ══════════════════════════════════════════════════════════════════════ */
+
+/* Poster block. TMDB art loads as a background image; the title stays behind
+   it as the fallback, so a missing poster still reads. */
+.sg-p {
+  display: flex; flex-direction: column; justify-content: flex-end; align-items: flex-start;
+  min-width: 0; overflow: hidden; overflow-wrap: anywhere; word-break: break-word;
+  padding: 5px; flex: none;
+  font-family: var(--font-heading); font-weight: 800; font-size: 9px; line-height: 1.05;
+  letter-spacing: 0.01em; color: var(--color-paper);
+  background-color: var(--color-neutral-800);
+  background-size: cover; background-position: center;
+}
+
+/* Badges — exactly one per row. */
+.sg-b {
+  display: inline-flex; align-items: center; white-space: nowrap;
+  font-family: var(--font-heading); font-weight: 800; font-size: 9px; line-height: 1;
+  letter-spacing: 0.09em; text-transform: uppercase; padding: 4px 7px;
+}
+.sg-lib { background: var(--badge-library-bg); color: var(--badge-library-fg); }
+.sg-mon { border: 1px solid var(--badge-monitored-border); color: var(--badge-monitored-fg); }
+.sg-req { background: var(--badge-requested-bg); color: var(--badge-requested-fg); }
+.sg-rev { background: var(--badge-review-bg); color: var(--badge-review-fg); }
+.sg-new { border: 1px solid var(--badge-new-border); color: var(--badge-new-fg); }
+
+/* Micro-label — the uppercase caption carrying every piece of metadata. */
+.sg-k {
+  font-family: var(--font-heading); font-weight: 800; font-size: 10px; line-height: 1.3;
+  letter-spacing: 0.12em; text-transform: uppercase; color: var(--color-muted);
+}
+
+.sg-row {
+  display: flex; align-items: center; gap: 14px; padding: 10px 20px;
+  border-bottom: 1px solid var(--color-line); cursor: pointer; width: 100%;
+  background: transparent; text-align: left; color: inherit; font: inherit;
+  border-left: 0; border-right: 0; border-top: 0;
+}
+.sg-row:hover, .sg-row[data-active="1"] { background: color-mix(in srgb, var(--color-accent) 10%, transparent); }
+.sg-row-title { font-family: var(--font-heading); font-weight: 800; font-size: 17px; line-height: 1.2; letter-spacing: -0.01em; }
+.sg-row-meta { font-size: 12px; line-height: 1.4; color: var(--color-muted); }
+.sg-row-action {
+  font-family: var(--font-heading); font-weight: 800; font-size: 11px;
+  letter-spacing: 0.08em; color: var(--color-accent); width: 64px; text-align: right;
+}
+@media (max-width: 767px) { .sg-row { padding: 12px 16px; } }
+
+.sg-chip {
+  font-family: var(--font-heading); font-weight: 800; font-size: 11px; line-height: 1;
+  letter-spacing: 0.07em; text-transform: uppercase; padding: 8px 12px;
+  border: 1px solid var(--color-divider); cursor: pointer;
+  background: transparent; color: var(--color-text);
+}
+.sg-chip[data-on="1"] { background: var(--color-text); color: var(--color-bg); border-color: var(--color-text); }
+.sg-chip:hover:not([data-on="1"]) { border-color: var(--color-accent); color: var(--color-accent); }
+
+/* The capture input — oversized, borderless, hard accent underline. */
+.sg-search {
+  border: 0; background: transparent; padding: 0; min-height: 0; width: 100%;
+  font-family: var(--font-heading); font-weight: 800; font-size: 30px; line-height: 1.1;
+  letter-spacing: -0.02em; color: var(--color-text); caret-color: var(--color-accent);
+}
+.sg-search::placeholder { color: color-mix(in srgb, var(--color-text) 35%, transparent); }
+.sg-rule { height: 2px; background: var(--color-accent); }
+.sg-rule[data-idle="1"] { background: var(--color-divider); }
+@media (max-width: 767px) { .sg-search { font-size: 26px; } }
+
+.sg-toast {
+  display: flex; align-items: center; gap: 14px;
+  background: var(--color-text); color: var(--color-bg); padding: 8px 8px 8px 14px;
+  box-shadow: var(--shadow-lg);
+}
+.sg-toast-text { font-family: var(--font-heading); font-weight: 800; font-size: 12px; letter-spacing: 0.04em; }
+
+.sg-banner {
+  display: flex; align-items: center; gap: 10px; padding: 9px 16px;
+  background: var(--color-accent); color: var(--color-bg);
+  font-family: var(--font-heading); font-weight: 800; font-size: 11px;
+  letter-spacing: 0.09em; text-transform: uppercase;
+}
+.sg-note {
+  display: flex; align-items: center; gap: 10px; padding: 10px 12px;
+  background: var(--badge-requested-bg); color: var(--badge-requested-fg);
+  font-family: var(--font-heading); font-weight: 800; font-size: 12px; letter-spacing: 0.03em;
+}
+
+.sg-foot {
+  display: flex; align-items: center; justify-content: space-between; gap: var(--space-3);
+  padding: 10px 20px; background: var(--color-surface);
+}
