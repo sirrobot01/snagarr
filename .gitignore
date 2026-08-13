@@ -26,3 +26,11 @@ node_modules/
 /bin/
 /coverage.out
 /coverage.html
+
+# Web build output and go-task state
+web/dist/
+.task/
+
+# Vite output embedded by internal/web
+internal/web/dist/*
+!internal/web/dist/.gitkeep
