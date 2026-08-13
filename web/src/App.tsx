@@ -59,7 +59,9 @@ function Shell() {
   const footer =
     counts && counts.needs_review > 0
       ? `${counts.needs_review} IN NEEDS REVIEW`
-      : `SNAGGED COLLECTION SYNCED ${relativeTime(status.data?.sync?.collection_at ?? null)}`;
+      : status.data?.sync?.collection_at
+        ? `SNAGGED COLLECTION SYNCED ${relativeTime(status.data.sync.collection_at)}`
+        : 'SNAGGED COLLECTION NOT SYNCED YET';
 
   return (
     <div className="sg-shell">

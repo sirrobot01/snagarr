@@ -47,7 +47,7 @@ export const CaptureBox = forwardRef<HTMLInputElement, Props>(function CaptureBo
         </span>
       </div>
 
-      <div className="sg-rule mt-3 md:hidden" data-idle={live ? undefined : '1'} />
+      <div className="sg-rule mt-3" data-idle={live ? undefined : '1'} />
     </section>
   );
 });
