@@ -10,7 +10,7 @@ data/
 *.log.*
 *.test
 /nntpmock
-dist/
+/dist/
 tmp/**
 torrents.json
 logs/**
@@ -28,7 +28,7 @@ node_modules/
 /coverage.html
 
 # Web build output and go-task state
-web/dist/
+/web/dist/
 .task/
 
 # Vite output embedded by internal/web
