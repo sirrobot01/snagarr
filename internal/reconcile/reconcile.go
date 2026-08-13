@@ -50,8 +50,9 @@ const syncStateKey = "sync_state"
 
 func New(s *store.Store, settings *config.Manager, log *slog.Logger) *Engine {
 	e := &Engine{store: s, settings: settings, log: log, trigger: make(chan struct{}, 1)}
+	// Unreadable sync state only costs one extra full sweep.
 	if raw, err := s.Setting(context.Background(), syncStateKey); err == nil {
-		json.Unmarshal(raw, &e.state)
+		_ = json.Unmarshal(raw, &e.state)
 	}
 	return e
 }

@@ -122,12 +122,7 @@ func (s *Server) captureKnownTitle(w http.ResponseWriter, r *http.Request, req c
 		return
 	}
 
-	s.store.PutEntity(ctx, store.Entity{
-		TMDBID: int64(details.TMDBID), MediaType: details.Type, Title: details.Title,
-		Year: details.Year, PosterPath: details.PosterPath, BackdropPath: details.BackdropPath,
-		Overview: details.Overview, Genres: details.Genres, Runtime: details.Runtime,
-		Popularity: details.Popularity,
-	})
+	s.cacheEntity(ctx, details)
 	if err := s.engine.RefreshItem(ctx, it.ID); err != nil {
 		s.log.Warn("could not compute state for new item", "item", it.ID, "error", err)
 	}
@@ -234,14 +229,13 @@ func (s *Server) resolveItem(w http.ResponseWriter, r *http.Request) {
 		s.writeStoreError(w, err, "item")
 		return
 	}
-	s.store.SetCandidates(r.Context(), it.ID, nil)
-	s.store.PutEntity(r.Context(), store.Entity{
-		TMDBID: int64(details.TMDBID), MediaType: details.Type, Title: details.Title,
-		Year: details.Year, PosterPath: details.PosterPath, BackdropPath: details.BackdropPath,
-		Overview: details.Overview, Genres: details.Genres, Runtime: details.Runtime,
-		Popularity: details.Popularity,
-	})
-	s.engine.RefreshItem(r.Context(), it.ID)
+	if err := s.store.SetCandidates(r.Context(), it.ID, nil); err != nil {
+		s.log.Warn("could not clear candidates", "item", it.ID, "error", err)
+	}
+	s.cacheEntity(r.Context(), details)
+	if err := s.engine.RefreshItem(r.Context(), it.ID); err != nil {
+		s.log.Warn("could not compute state after resolve", "item", it.ID, "error", err)
+	}
 
 	s.respondWithItem(w, r, it.ID)
 }
@@ -397,6 +391,19 @@ func (s *Server) respondWithItem(w http.ResponseWriter, r *http.Request, id int6
 		return
 	}
 	writeJSON(w, http.StatusOK, newItemDTO(*it))
+}
+
+// cacheEntity stores TMDB metadata so the item keeps its poster and overview
+// when TMDB is later unreachable. A failure here costs artwork, never data.
+func (s *Server) cacheEntity(ctx context.Context, d *tmdb.Details) {
+	if err := s.store.PutEntity(ctx, store.Entity{
+		TMDBID: int64(d.TMDBID), MediaType: d.Type, Title: d.Title,
+		Year: d.Year, PosterPath: d.PosterPath, BackdropPath: d.BackdropPath,
+		Overview: d.Overview, Genres: d.Genres, Runtime: d.Runtime,
+		Popularity: d.Popularity,
+	}); err != nil {
+		s.log.Warn("could not cache metadata", "tmdb_id", d.TMDBID, "error", err)
+	}
 }
 
 func (s *Server) clients() clients.Set {

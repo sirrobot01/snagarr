@@ -10,6 +10,8 @@ import (
 	"path/filepath"
 	"time"
 
+	// The CGO-free SQLite driver. Snagarr ships as a static binary, so a
+	// cgo-based driver is not an option.
 	_ "modernc.org/sqlite"
 )
 
@@ -64,12 +66,12 @@ func (s *Store) migrate() error {
 			return fmt.Errorf("migration %d: %w", i+1, err)
 		}
 		if _, err := tx.Exec(migrations[i]); err != nil {
-			tx.Rollback()
+			_ = tx.Rollback()
 			return fmt.Errorf("migration %d: %w", i+1, err)
 		}
 		// PRAGMA does not accept bound parameters.
 		if _, err := tx.Exec(fmt.Sprintf("PRAGMA user_version = %d", i+1)); err != nil {
-			tx.Rollback()
+			_ = tx.Rollback()
 			return fmt.Errorf("migration %d: set version: %w", i+1, err)
 		}
 		if err := tx.Commit(); err != nil {

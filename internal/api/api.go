@@ -32,7 +32,7 @@ func New(st *store.Store, settings *config.Manager, res *resolver.Resolver,
 
 func (s *Server) Handler() http.Handler {
 	r := chi.NewRouter()
-	r.Use(middleware.RequestID, middleware.RealIP, middleware.Recoverer, s.logRequests)
+	r.Use(middleware.RequestID, middleware.Recoverer, s.logRequests)
 
 	r.Route("/api/v1", func(r chi.Router) {
 		r.Get("/health", s.health)
@@ -77,7 +77,7 @@ func (s *Server) Handler() http.Handler {
 	return r
 }
 
-func (s *Server) health(w http.ResponseWriter, r *http.Request) {
+func (s *Server) health(w http.ResponseWriter, _ *http.Request) {
 	writeJSON(w, http.StatusOK, map[string]string{"status": "ok", "version": buildVersion})
 }
 
@@ -109,7 +109,7 @@ func (s *Server) status(w http.ResponseWriter, r *http.Request) {
 	})
 }
 
-func (s *Server) forceSync(w http.ResponseWriter, r *http.Request) {
+func (s *Server) forceSync(w http.ResponseWriter, _ *http.Request) {
 	s.engine.Trigger()
 	writeJSON(w, http.StatusAccepted, map[string]string{"status": "queued"})
 }

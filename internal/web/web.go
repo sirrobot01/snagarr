@@ -26,7 +26,7 @@ func Handler() http.Handler {
 	if err != nil {
 		// A binary built without `task web` has no UI. The API still works, so
 		// say so plainly instead of failing to start.
-		return http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		return http.HandlerFunc(func(w http.ResponseWriter, _ *http.Request) {
 			http.Error(w, "web client not built: run `task web` before building", http.StatusNotFound)
 		})
 	}
@@ -56,5 +56,5 @@ func Handler() http.Handler {
 func serveIndex(w http.ResponseWriter, index []byte) {
 	w.Header().Set("Content-Type", "text/html; charset=utf-8")
 	w.Header().Set("Cache-Control", "no-cache")
-	w.Write(index)
+	_, _ = w.Write(index)
 }

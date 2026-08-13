@@ -14,7 +14,7 @@ import (
 
 // getSettings returns the live settings with every secret masked. The client
 // echoes masked values back unchanged, and the manager restores the real ones.
-func (s *Server) getSettings(w http.ResponseWriter, r *http.Request) {
+func (s *Server) getSettings(w http.ResponseWriter, _ *http.Request) {
 	body, err := s.settingsBody(s.settings.Get())
 	if err != nil {
 		s.log.Error("could not encode settings", "error", err)
@@ -143,13 +143,13 @@ func (s *Server) serviceOptions(w http.ResponseWriter, r *http.Request) {
 			writeError(w, http.StatusServiceUnavailable, codeNotConfigured, "Radarr is not configured")
 			return
 		}
-		s.writeArrOptions(w, ctx, set.Radarr)
+		s.writeArrOptions(ctx, w, set.Radarr)
 	case "sonarr":
 		if set.Sonarr == nil {
 			writeError(w, http.StatusServiceUnavailable, codeNotConfigured, "Sonarr is not configured")
 			return
 		}
-		s.writeArrOptions(w, ctx, set.Sonarr)
+		s.writeArrOptions(ctx, w, set.Sonarr)
 	case "library":
 		if set.Library == nil {
 			writeError(w, http.StatusServiceUnavailable, codeNotConfigured, "no media server is configured")
@@ -177,7 +177,7 @@ type arrOptions interface {
 	RootFolders(ctx context.Context) ([]arr.RootFolder, error)
 }
 
-func (s *Server) writeArrOptions(w http.ResponseWriter, ctx context.Context, c arrOptions) {
+func (s *Server) writeArrOptions(ctx context.Context, w http.ResponseWriter, c arrOptions) {
 	profiles, err := c.QualityProfiles(ctx)
 	if err != nil {
 		writeError(w, http.StatusBadGateway, codeUpstreamError, "%v", err)

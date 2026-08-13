@@ -33,9 +33,12 @@ type errorBody struct {
 func writeJSON(w http.ResponseWriter, status int, v any) {
 	w.Header().Set("Content-Type", "application/json; charset=utf-8")
 	w.WriteHeader(status)
-	if v != nil {
-		json.NewEncoder(w).Encode(v)
+	if v == nil {
+		return
 	}
+	// The header is already sent, so a write failure can only be logged by the
+	// caller's middleware; there is no status left to change.
+	_ = json.NewEncoder(w).Encode(v)
 }
 
 func writeError(w http.ResponseWriter, status int, code, format string, args ...any) {

@@ -63,7 +63,7 @@ func (s *Store) UpsertLibrary(ctx context.Context, entries []LibraryEntry) error
 	if err != nil {
 		return fmt.Errorf("sync library index: %w", err)
 	}
-	defer tx.Rollback()
+	defer tx.Rollback() //nolint:errcheck // no-op once Commit has run
 
 	stmt, err := tx.PrepareContext(ctx,
 		`INSERT INTO library_index
@@ -108,7 +108,7 @@ func (s *Store) ReplaceArrIndex(ctx context.Context, source string, entries []Ar
 	if err != nil {
 		return fmt.Errorf("sync arr index: %w", err)
 	}
-	defer tx.Rollback()
+	defer tx.Rollback() //nolint:errcheck // no-op once Commit has run
 
 	if _, err := tx.ExecContext(ctx, `DELETE FROM arr_index WHERE source = ?`, source); err != nil {
 		return fmt.Errorf("sync arr index: %w", err)
@@ -133,7 +133,7 @@ func (s *Store) ReplaceRequests(ctx context.Context, entries []RequestEntry) err
 	if err != nil {
 		return fmt.Errorf("sync request index: %w", err)
 	}
-	defer tx.Rollback()
+	defer tx.Rollback() //nolint:errcheck // no-op once Commit has run
 
 	if _, err := tx.ExecContext(ctx, `DELETE FROM request_index`); err != nil {
 		return fmt.Errorf("sync request index: %w", err)

@@ -150,7 +150,8 @@ func scanItem(row interface{ Scan(...any) error }) (*Item, error) {
 	it.Overview = overview.String
 	it.Runtime = int(runtime.Int64)
 	if genres.String != "" {
-		json.Unmarshal([]byte(genres.String), &it.Genres)
+		// A corrupt genre blob leaves the slice nil rather than failing the read.
+		_ = json.Unmarshal([]byte(genres.String), &it.Genres)
 	}
 	return &it, nil
 }
@@ -313,7 +314,7 @@ func (s *Store) SetCandidates(ctx context.Context, itemID int64, candidates []Ca
 	if err != nil {
 		return fmt.Errorf("set candidates: %w", err)
 	}
-	defer tx.Rollback()
+	defer tx.Rollback() //nolint:errcheck // no-op once Commit has run
 
 	if _, err := tx.ExecContext(ctx, `DELETE FROM candidates WHERE item_id = ?`, itemID); err != nil {
 		return fmt.Errorf("set candidates: %w", err)

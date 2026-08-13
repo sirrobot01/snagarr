@@ -69,7 +69,8 @@ func (s *Store) Entity(ctx context.Context, tmdbID int64, t media.Type) (*Entity
 	e.Year, e.Runtime = int(year.Int64), int(runtime.Int64)
 	e.PosterPath, e.BackdropPath, e.Overview = poster.String, backdrop.String, overview.String
 	if genres.String != "" {
-		json.Unmarshal([]byte(genres.String), &e.Genres)
+		// A corrupt genre blob leaves the slice nil rather than failing the read.
+		_ = json.Unmarshal([]byte(genres.String), &e.Genres)
 	}
 	return &e, nil
 }

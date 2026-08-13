@@ -56,7 +56,7 @@ func TestScrapeExtractsTMDBLinkAndTitle(t *testing.T) {
 		<a href="https://www.themoviedb.org/movie/1233413/">TMDb</a>
 		<a href="https://www.imdb.com/title/tt31193180/">IMDb</a>
 		</body></html>`
-	srv := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+	srv := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, _ *http.Request) {
 		w.Write([]byte(page))
 	}))
 	defer srv.Close()
@@ -80,7 +80,7 @@ func TestScrapeExtractsTMDBLinkAndTitle(t *testing.T) {
 }
 
 func TestScrapeFallsBackToTitleTag(t *testing.T) {
-	srv := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+	srv := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, _ *http.Request) {
 		w.Write([]byte(`<html><head><title>The Substance | Reviews</title></head><body></body></html>`))
 	}))
 	defer srv.Close()
@@ -95,7 +95,7 @@ func TestScrapeFallsBackToTitleTag(t *testing.T) {
 }
 
 func TestScrapeReportsDeadLinks(t *testing.T) {
-	srv := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+	srv := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, _ *http.Request) {
 		http.Error(w, "gone", http.StatusNotFound)
 	}))
 	defer srv.Close()

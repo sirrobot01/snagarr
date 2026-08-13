@@ -87,7 +87,7 @@ type playbackEvent struct {
 
 	Item struct {
 		Type        string            `json:"Type"`
-		ProviderIds map[string]string `json:"ProviderIds"`
+		ProviderIDs map[string]string `json:"ProviderIds"`
 	} `json:"Item"`
 }
 
@@ -104,7 +104,7 @@ func (s *Server) handlePlayback(r *http.Request, service string, body []byte) {
 		mediaType = media.TV
 	}
 	if tmdbID == 0 {
-		for name, value := range event.Item.ProviderIds {
+		for name, value := range event.Item.ProviderIDs {
 			if len(name) == 4 && (name == "Tmdb" || name == "tmdb" || name == "TMDB") {
 				tmdbID = parseTMDBID(value)
 				break
