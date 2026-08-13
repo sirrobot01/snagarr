@@ -15,7 +15,7 @@ export function SetupCard({ step, title, copy, children, footer }: Props) {
     <div className="sg-pad py-8">
       <div className="sg-setup-card">
         <div className="flex flex-col gap-2 px-6 pb-4 pt-6">
-          <span className="sg-k">SETUP · STEP {step + 1} OF 4</span>
+          <span className="sg-k">Setup · Step {step + 1} of 4</span>
           <h2 className="m-0" style={{ fontSize: 34, letterSpacing: '-0.03em' }}>
             {title}
           </h2>
@@ -24,7 +24,9 @@ export function SetupCard({ step, title, copy, children, footer }: Props) {
 
         <div className="sg-progress">
           {SLOTS.map((slot) => (
-            <span key={slot} data-on={slot <= step ? '1' : undefined} />
+            <span key={slot} data-on={slot <= step ? '1' : undefined}>
+              <span className="sr-only">Step {slot + 1}</span>
+            </span>
           ))}
         </div>
 

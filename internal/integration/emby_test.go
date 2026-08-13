@@ -81,7 +81,10 @@ func TestEmbySyncCollection(t *testing.T) {
 	}))
 	defer srv.Close()
 
-	err := NewEmby(srv.URL, "key", false).SyncCollection(context.Background(), "Snagged", []string{"b", "c"})
+	// Box sets take any type, so members from different sections share one
+	// collection.
+	members := []CollectionMember{{ID: "b", SectionID: "1"}, {ID: "c", SectionID: "2"}}
+	err := NewEmby(srv.URL, "key", false).SyncCollection(context.Background(), "Snagged", members)
 	if err != nil {
 		t.Fatalf("SyncCollection: %v", err)
 	}

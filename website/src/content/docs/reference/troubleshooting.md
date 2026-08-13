@@ -93,12 +93,12 @@ Sending is personal. Snagarr uses the service the **caller** owns.
 
 A member never falls through to an admin's service. An admin falls through to their own, then the capturer's, then another admin's.
 
-## A lost token
+## A lost client token
 
-Snagarr stores only the SHA-256 digest of a token, so a lost value cannot be recovered.
-
-- **A client token.** Issue a new one with an admin token: `POST /api/v1/users/{id}/tokens`.
-- **The only admin token.** There is no recovery command. Snagarr creates the admin and prints a token only when the user table is empty. Stop Snagarr, move `snagarr.db` aside, start it and read the new token. The new database is empty: no items, no users and no settings. Keep the old file if you want the items back.
+Snagarr stores only the SHA-256 digest of a token, so a lost value cannot be
+recovered. Issue a replacement from the household settings or with an admin
+token: `POST /api/v1/users/{id}/tokens`. Browser sessions are created by signing
+in again and are not copied into client configuration.
 
 ## A lost `secret.key`
 

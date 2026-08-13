@@ -6,7 +6,7 @@
     <meta name="color-scheme" content="dark light" />
     <meta name="description" content="Snagarr — capture what you want to watch." />
     <title>Snagarr</title>
-    <script>(function(){var t=localStorage.getItem('snagarr.theme')||(matchMedia('(prefers-color-scheme: light)').matches?'light':'dark');document.documentElement.dataset.theme=t})()</script>
+    <script>(function(){var t=localStorage.getItem('snagarr.theme')||'light';document.documentElement.dataset.theme=t})()</script>
   </head>
   <body>
     <div id="root"></div>

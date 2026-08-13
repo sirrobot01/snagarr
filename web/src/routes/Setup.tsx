@@ -23,7 +23,7 @@ const STEPS = [
   },
   {
     title: 'You are set up',
-    copy: 'Take the household token, then start snagging.',
+    copy: 'Review your connections, then start building the household list.',
   },
 ];
 
@@ -65,7 +65,7 @@ export default function Setup() {
   if (!settings.data) {
     return (
       <SetupCard step={step} title={page.title} copy={page.copy}>
-        <Loading label="LOADING SETTINGS…" />
+        <Loading label="Loading settings…" />
       </SetupCard>
     );
   }
@@ -100,7 +100,7 @@ export default function Setup() {
             disabled={save.isPending}
             onClick={() => void advance(true)}
           >
-            {save.isPending ? 'SAVING…' : 'CONTINUE'}
+            {save.isPending ? 'Saving…' : 'Continue'}
           </button>
         </>
       }

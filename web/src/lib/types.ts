@@ -14,7 +14,7 @@ export type SendTarget = 'radarr' | 'sonarr' | 'overseerr';
 
 export interface UserRef {
   id: number;
-  display_name: string;
+  username: string;
   role: Role;
 }
 
@@ -108,7 +108,7 @@ export interface StatusResponse {
 
 export interface HouseholdUser {
   id: number;
-  display_name: string;
+  username: string;
   role: Role;
   telegram_user_id: number | null;
   token_count: number;
@@ -247,11 +247,14 @@ export interface PlexConnection {
   uri: string;
   local: boolean;
   relay: boolean;
+  /** True when this server answered snagarr on this address. */
+  reachable: boolean;
 }
 
 export interface PlexServer {
   name: string;
   client_identifier: string;
-  /** Ordered fastest-first, so the head is the one worth storing. */
+  /** Ordered best-first: answers before silence, local before relay. Every
+      returned route remains selectable. */
   connections: PlexConnection[];
 }

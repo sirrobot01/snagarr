@@ -128,6 +128,29 @@ describe('keyboard navigation', () => {
     expect(rows()[1]).toHaveAttribute('data-active', '1');
   });
 
+  // A library row carries state "available" but no item until somebody snags it.
+  // Opening the list for one of those lands on a page that cannot show it.
+  it('snags a library title nobody has snagged yet', async () => {
+    setToken('sngr_test');
+    const owned = { ...result(3, 'Heat'), state: 'available' as const, from: 'library' };
+    const fetchMock = mockFetch((url) => {
+      if (url.includes('/search')) return { body: { results: [owned] } };
+      if (url.includes('/capture')) return { body: { id: 9, tmdb_id: 3, status: 'available' } };
+      return { body: { items: [], total: 0 } };
+    });
+    render(<Snag />, { wrapper: wrapper(makeClient()) });
+
+    const input = screen.getByRole('searchbox');
+    fireEvent.change(input, { target: { value: 'heat' } });
+    await waitFor(() => expect(rows()).toHaveLength(1));
+    expect(rows()[0]).toHaveTextContent('Snag');
+
+    fireEvent.click(rows()[0]);
+    await waitFor(() =>
+      expect(fetchMock.mock.calls.some(([url]) => String(url).includes('/capture'))).toBe(true),
+    );
+  });
+
   it('clears the query and blurs on Escape', () => {
     const { input } = setup();
 

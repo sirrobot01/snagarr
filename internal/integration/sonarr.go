@@ -82,13 +82,13 @@ func (s *SonarrClient) RootFolders(ctx context.Context) ([]RootFolder, error) {
 	return folders, nil
 }
 
-// Ping reports connectivity and how many series Sonarr tracks.
+// Ping reports connectivity.
 func (s *SonarrClient) Ping(ctx context.Context) (string, error) {
-	items, err := s.List(ctx)
+	status, err := arrStatus(ctx, s.rest)
 	if err != nil {
 		return "", fmt.Errorf("sonarr ping: %w", err)
 	}
-	return "OK · " + strconv.Itoa(len(items)) + " series", nil
+	return status, nil
 }
 
 // lookupSeries tries TVDB, then IMDB, then the plain title, and prefers a result

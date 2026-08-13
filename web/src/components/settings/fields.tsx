@@ -1,3 +1,4 @@
+import { Copy, LockKeyhole } from 'lucide-react';
 import { pushToast } from '../../lib/toast';
 
 const CONTROL = { minHeight: 44 };
@@ -7,9 +8,15 @@ interface TextFieldProps {
   label: string;
   value: string;
   onChange: (value: string) => void;
+  onBlur?: () => void;
   locked?: boolean;
   placeholder?: string;
   inputMode?: 'text' | 'numeric' | 'url';
+  type?: 'text' | 'password' | 'url';
+  autoComplete?: string;
+  description?: string;
+  required?: boolean;
+  minLength?: number;
 }
 
 export function TextField({
@@ -17,26 +24,50 @@ export function TextField({
   label,
   value,
   onChange,
+  onBlur,
   locked,
   placeholder,
   inputMode,
+  type = 'text',
+  autoComplete = 'off',
+  description,
+  required,
+  minLength,
 }: TextFieldProps) {
   return (
     <div className="field">
-      <label htmlFor={id}>{locked ? `${label} · LOCKED` : label}</label>
+      <label htmlFor={id} className="flex items-center gap-1.5">
+        {label}
+        {locked && (
+          <span className="sg-field-lock" title="Managed outside Snagarr">
+            <LockKeyhole aria-hidden="true" size={12} />
+            Locked
+          </span>
+        )}
+      </label>
       <input
         id={id}
         className="input"
         style={CONTROL}
+        type={type}
         value={value}
         placeholder={placeholder}
         inputMode={inputMode}
         readOnly={locked}
-        autoComplete="off"
+        autoComplete={autoComplete}
         autoCapitalize="off"
         spellCheck={false}
+        required={required}
+        minLength={minLength}
+        aria-describedby={description ? `${id}-description` : undefined}
         onChange={(event) => onChange(event.target.value)}
+        onBlur={onBlur}
       />
+      {description && (
+        <p id={`${id}-description`} className="sg-field-help">
+          {description}
+        </p>
+      )}
     </div>
   );
 }
@@ -62,7 +93,7 @@ export function SelectField({
 }: SelectFieldProps) {
   return (
     <div className="field">
-      <label htmlFor={id}>{locked ? `${label} · LOCKED` : label}</label>
+      <label htmlFor={id}>{locked ? `${label} · Locked` : label}</label>
       <select
         id={id}
         className="input"
@@ -130,7 +161,8 @@ export function CheckField({ id, label, checked, onChange, locked }: CheckFieldP
         disabled={locked}
         onChange={(event) => onChange(event.target.checked)}
       />
-      {locked ? `${label} · LOCKED` : label}
+      <span>{label}</span>
+      {locked && <LockKeyhole aria-label="Locked" size={12} />}
     </label>
   );
 }
@@ -153,6 +185,7 @@ export function CopyField({ id, label, value }: { id: string; label: string; val
           className="btn btn-secondary min-h-[44px]"
           onClick={() => copyToClipboard(value)}
         >
+          <Copy aria-hidden="true" size={16} />
           Copy
         </button>
       </div>
@@ -162,7 +195,7 @@ export function CopyField({ id, label, value }: { id: string; label: string; val
 
 function copyToClipboard(value: string) {
   navigator.clipboard.writeText(value).then(
-    () => pushToast('COPIED TO CLIPBOARD'),
-    () => pushToast('COPY FAILED — SELECT THE TEXT AND COPY IT'),
+    () => pushToast('Copied to clipboard'),
+    () => pushToast('Copy failed — select the text and copy it'),
   );
 }

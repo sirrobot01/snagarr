@@ -8,9 +8,9 @@ function current(): Theme {
 
 export function ThemeToggle() {
   const [theme, setTheme] = useState<Theme>(current);
+  const next = theme === 'dark' ? 'light' : 'dark';
 
   function flip() {
-    const next: Theme = theme === 'dark' ? 'light' : 'dark';
     document.documentElement.dataset.theme = next;
     localStorage.setItem('snagarr.theme', next);
     setTheme(next);
@@ -21,9 +21,10 @@ export function ThemeToggle() {
       type="button"
       className="sg-theme-toggle"
       onClick={flip}
-      aria-label={`Switch to ${theme === 'dark' ? 'light' : 'dark'} theme`}
+      aria-label={`Switch to ${next} theme`}
+      title={`Switch to ${next} theme`}
     >
-      {theme === 'dark' ? 'LIGHT' : 'DARK'}
+      {next}
     </button>
   );
 }

@@ -1,4 +1,5 @@
 import { useState } from 'react';
+import { Archive, Check, Search } from 'lucide-react';
 import { Poster } from './Poster';
 import { shortDate } from '../lib/format';
 import { useArchive, useItem, useResolve } from '../lib/queries';
@@ -22,15 +23,17 @@ export function NeedsReviewCard({ item, onSearchManually }: Props) {
   return (
     <div className="sg-pad py-4">
       <p className="sg-k">
-        {['CAPTURED ' + shortDate(item.captured_at), item.source, item.captured_by?.display_name]
+        {['Captured ' + shortDate(item.captured_at), item.source, item.captured_by?.username]
           .filter(Boolean)
-          .join(' · ')
-          .toUpperCase()}
+          .join(' · ')}
       </p>
       <p className="sg-raw mt-1">&ldquo;{item.raw_input}&rdquo;</p>
+      <p className="text-muted m-0 mt-1 text-[13px]">
+        Choose the closest match below, or search again using the original text.
+      </p>
 
-      {detail.isPending && <p className="sg-k mt-4">LOADING CANDIDATES…</p>}
-      {detail.isError && <p className="sg-k mt-4">CANDIDATES UNAVAILABLE</p>}
+      {detail.isPending && <p className="sg-k mt-4">Loading candidates…</p>}
+      {detail.isError && <p className="sg-k sg-error mt-4">Candidates unavailable</p>}
 
       {candidates.length > 0 && (
         <div className="sg-cand-grid mt-4">
@@ -44,6 +47,11 @@ export function NeedsReviewCard({ item, onSearchManually }: Props) {
               onClick={() => setPicked(candidate.tmdb_id)}
             >
               <Poster fill path={candidate.poster_path} title={candidate.title} size="w185" />
+              {candidate.tmdb_id === selected?.tmdb_id && (
+                <span className="sg-cand-check" aria-label="Selected">
+                  <Check size={14} />
+                </span>
+              )}
               <span className="sg-cand-title block">{candidate.title}</span>
               <span className="sg-cand-sub block">
                 {candidate.year ?? '—'} · {Math.round(candidate.score * 100)}% match
@@ -60,9 +68,10 @@ export function NeedsReviewCard({ item, onSearchManually }: Props) {
           disabled={!selected || resolve.isPending}
           onClick={() => selected && resolve.mutate({ item, candidate: selected })}
         >
+          <Check aria-hidden="true" size={16} />
           {selected
-            ? `CONFIRM ${selected.title.toUpperCase()}${selected.year ? ` (${selected.year})` : ''}`
-            : 'CONFIRM'}
+            ? `Confirm ${selected.title}${selected.year ? ` (${selected.year})` : ''}`
+            : 'Confirm match'}
         </button>
 
         <button
@@ -70,6 +79,7 @@ export function NeedsReviewCard({ item, onSearchManually }: Props) {
           className="btn btn-secondary"
           onClick={() => onSearchManually(item.raw_input)}
         >
+          <Search aria-hidden="true" size={16} />
           Search manually
         </button>
 
@@ -78,6 +88,7 @@ export function NeedsReviewCard({ item, onSearchManually }: Props) {
           className="btn btn-ghost ml-auto"
           onClick={() => archive.mutate({ item, value: true })}
         >
+          <Archive aria-hidden="true" size={16} />
           Discard
         </button>
       </div>

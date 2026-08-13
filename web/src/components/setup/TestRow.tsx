@@ -1,3 +1,4 @@
+import { CheckCircle2, PlugZap } from 'lucide-react';
 import type { ServiceTest } from '../settings/service';
 
 export function TestRow({ test, note }: { test: ServiceTest; note?: string }) {
@@ -13,13 +14,17 @@ export function TestRow({ test, note }: { test: ServiceTest; note?: string }) {
         disabled={test.pending}
         onClick={test.run}
       >
-        {test.pending ? 'TESTING…' : failed ? 'RETEST' : 'Test connection'}
+        <PlugZap aria-hidden="true" size={16} />
+        {test.pending ? 'Testing…' : failed ? 'Retry' : 'Test connection'}
       </button>
 
       {result?.ok === true && (
-        <p className="sg-note m-0">{note ?? result.message.toUpperCase()}</p>
+        <p className="sg-success m-0 flex items-center gap-2 p-3">
+          <CheckCircle2 aria-hidden="true" size={16} />
+          {note ?? result.message}
+        </p>
       )}
-      {failed && <p className="sg-k m-0">{result.message.toUpperCase()}</p>}
+      {failed && <p className="sg-k sg-error m-0">{result.message}</p>}
     </div>
   );
 }

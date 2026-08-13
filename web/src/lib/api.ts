@@ -118,7 +118,12 @@ export const api = {
 
   users: () => request<{ users: HouseholdUser[] }>('/users'),
 
-  createUser: (body: { display_name: string; role: string; telegram_user_id?: number }) =>
+  createUser: (body: {
+    username: string;
+    password: string;
+    role: string;
+    telegram_user_id?: number;
+  }) =>
     request<HouseholdUser>('/users', { method: 'POST', ...json(body) }),
 
   deleteUser: (id: number) => request<void>(`/users/${id}`, { method: 'DELETE' }),

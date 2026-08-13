@@ -63,7 +63,7 @@ describe('optimistic snag', () => {
 
     await waitFor(() => expect(result.current.isSuccess).toBe(true));
     expect(client.getQueryData<ItemsResponse>(keys.items(false))?.items[0]?.id).toBe(10);
-    expect(getToasts().at(-1)?.action?.label).toBe('UNDO');
+    expect(getToasts().at(-1)?.action?.label).toBe('Undo');
   });
 
   it('rolls the row back and toasts when the capture fails', async () => {
@@ -85,6 +85,6 @@ describe('optimistic snag', () => {
     const data = client.getQueryData<ItemsResponse>(keys.items(false));
     expect(data?.items).toHaveLength(1);
     expect(data?.items[0]?.id).toBe(EXISTING.id);
-    expect(getToasts().at(-1)?.text).toContain('SNAG FAILED');
+    expect(getToasts().at(-1)?.text).toContain('Snag failed');
   });
 });

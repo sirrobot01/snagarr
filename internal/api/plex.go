@@ -106,7 +106,9 @@ func (s *Server) listPlexServers(w http.ResponseWriter, r *http.Request) {
 	for _, res := range resources {
 		connections := make([]map[string]any, 0, len(res.Connections))
 		for _, c := range res.Connections {
-			connections = append(connections, map[string]any{"uri": c.URI, "local": c.Local, "relay": c.Relay})
+			connections = append(connections, map[string]any{
+				"uri": c.URI, "local": c.Local, "relay": c.Relay, "reachable": c.Reachable,
+			})
 		}
 		servers = append(servers, map[string]any{
 			"name": res.Name, "client_identifier": res.ClientIdentifier, "connections": connections,

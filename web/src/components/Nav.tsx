@@ -1,9 +1,10 @@
+import { useEffect, useRef, useState } from 'react';
 import { Link, useLocation } from 'wouter';
-import { ThemeToggle } from './ThemeToggle';
-import type { UserRef } from '../lib/types';
 
-/* Settings is on every member's nav: it is where they connect their own Plex
-   and their own Radarr. The install-wide cards inside are still admin-only. */
+import { clearToken } from '../lib/auth';
+import type { UserRef } from '../lib/types';
+import { ThemeToggle } from './ThemeToggle';
+
 const LINKS = [
   { href: '/', label: 'Snag' },
   { href: '/list', label: 'List' },
@@ -12,37 +13,88 @@ const LINKS = [
 
 export function Nav({ me }: { me: UserRef | undefined }) {
   const [location] = useLocation();
-  const links = LINKS;
-  const other =
-    location === '/' ? { href: '/list', label: 'LIST →' } : { href: '/', label: '← SNAG' };
+  const [accountOpen, setAccountOpen] = useState(false);
+  const accountRef = useRef<HTMLDivElement>(null);
+
+  useEffect(() => setAccountOpen(false), [location]);
+
+  useEffect(() => {
+    if (!accountOpen) return;
+
+    function onPointerDown(event: PointerEvent) {
+      if (!accountRef.current?.contains(event.target as Node)) setAccountOpen(false);
+    }
+    function onKeyDown(event: KeyboardEvent) {
+      if (event.key === 'Escape') setAccountOpen(false);
+    }
+
+    document.addEventListener('pointerdown', onPointerDown);
+    document.addEventListener('keydown', onKeyDown);
+    return () => {
+      document.removeEventListener('pointerdown', onPointerDown);
+      document.removeEventListener('keydown', onKeyDown);
+    };
+  }, [accountOpen]);
 
   return (
     <header className="nav">
-      <span className="nav-brand md:mr-0">SNAGARR</span>
+      <div className="nav-inner">
+        <Link href="/" className="nav-brand" aria-label="Snagarr home">
+          Snagarr
+        </Link>
 
-      <nav className="hidden items-center gap-4 md:flex">
-        {links.map((link) => (
-          <Link
-            key={link.href}
-            href={link.href}
-            aria-current={location === link.href ? 'page' : undefined}
-          >
-            {link.label}
-          </Link>
-        ))}
-      </nav>
+        <nav className="nav-links" aria-label="Main navigation">
+          {LINKS.map(({ href, label }) => (
+            <Link
+              key={href}
+              href={href}
+              className="nav-link"
+              aria-label={label}
+              aria-current={location === href ? 'page' : undefined}
+            >
+              {label}
+            </Link>
+          ))}
+        </nav>
 
-      {me && (
-        <span className="sg-k ml-auto hidden md:inline">
-          {me.display_name} · {me.role}
-        </span>
-      )}
+        <span className="nav-spacer" />
+        <ThemeToggle />
 
-      <Link href={other.href} className="sg-k ml-auto md:hidden">
-        {other.label}
-      </Link>
+        {me && (
+          <div className="nav-account" ref={accountRef}>
+            <button
+              type="button"
+              className="nav-account-trigger"
+              aria-label={`Account menu for ${me.username}`}
+              aria-haspopup="menu"
+              aria-expanded={accountOpen}
+              aria-controls="account-menu"
+              onClick={() => setAccountOpen((open) => !open)}
+            >
+              <span className="nav-account-copy">
+                <span className="nav-account-name">{me.username}</span>
+              </span>
+            </button>
 
-      <ThemeToggle />
+            {accountOpen && (
+              <div className="nav-menu" id="account-menu" role="menu">
+                <div className="nav-menu-meta">
+                  <strong>{me.username}</strong>
+                  <span>Signed in · {me.role}</span>
+                </div>
+                <button
+                  type="button"
+                  className="nav-menu-item"
+                  role="menuitem"
+                  onClick={clearToken}
+                >
+                  Sign out
+                </button>
+              </div>
+            )}
+          </div>
+        )}
+      </div>
     </header>
   );
 }

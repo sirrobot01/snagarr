@@ -40,10 +40,10 @@ services:
 ```
 
 ```bash
-docker compose up -d && docker compose logs snagarr
+docker compose up -d
 ```
 
-The log prints a setup URL carrying the admin token. Open it.
+Open `http://localhost:8080` and create the first administrator account.
 
 Binaries for linux, darwin, windows and freebsd are on the
 [releases page](https://github.com/sirrobot01/snagarr/releases). Run

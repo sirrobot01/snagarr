@@ -19,6 +19,7 @@ type TitleKey struct {
 // LibraryEntry mirrors one title held by a media server.
 type LibraryEntry struct {
 	ProviderItemID string
+	SectionID      string
 	TMDBID         int64
 	IMDBID         string
 	TVDBID         int64
@@ -64,9 +65,10 @@ func (s *Store) UpsertLibrary(ctx context.Context, serviceID int64, entries []Li
 
 	stmt, err := tx.PrepareContext(ctx,
 		`INSERT INTO library_index
-			(service_id, provider_item_id, tmdb_id, imdb_id, tvdb_id, media_type, title, year, added_at, last_seen_at)
-		 VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
+			(service_id, provider_item_id, section_id, tmdb_id, imdb_id, tvdb_id, media_type, title, year, added_at, last_seen_at)
+		 VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
 		 ON CONFLICT (service_id, provider_item_id) DO UPDATE SET
+			section_id = excluded.section_id,
 			tmdb_id = excluded.tmdb_id, imdb_id = excluded.imdb_id, tvdb_id = excluded.tvdb_id,
 			media_type = excluded.media_type, title = excluded.title, year = excluded.year,
 			last_seen_at = excluded.last_seen_at`)
@@ -77,7 +79,7 @@ func (s *Store) UpsertLibrary(ctx context.Context, serviceID int64, entries []Li
 
 	now := time.Now().UTC()
 	for _, e := range entries {
-		if _, err := stmt.ExecContext(ctx, serviceID, e.ProviderItemID, nullInt(e.TMDBID),
+		if _, err := stmt.ExecContext(ctx, serviceID, e.ProviderItemID, e.SectionID, nullInt(e.TMDBID),
 			nullStr(e.IMDBID), nullInt(e.TVDBID), e.MediaType, e.Title,
 			nullInt(int64(e.Year)), nullTime(e.AddedAt), now); err != nil {
 			return fmt.Errorf("sync library index: %w", err)
@@ -256,11 +258,19 @@ func (s *Store) LoadStateIndex(ctx context.Context) (*StateIndex, error) {
 // requestAvailable is the Overseerr status that means the file has landed.
 const requestAvailable = "available"
 
+// LibraryMember is one title on one server: the id that server knows it by and
+// the section it sits in. A Plex collection belongs to a single section, so
+// building one needs both halves.
+type LibraryMember struct {
+	ProviderItemID string
+	SectionID      string
+}
+
 // LibraryMembers maps each media server to the titles it holds. Collections are
 // personal: a member's Snagged collection may only name items that server has.
-func (s *Store) LibraryMembers(ctx context.Context) (map[int64]map[TitleKey]string, error) {
+func (s *Store) LibraryMembers(ctx context.Context) (map[int64]map[TitleKey]LibraryMember, error) {
 	rows, err := s.db.QueryContext(ctx,
-		`SELECT l.service_id, l.tmdb_id, l.media_type, l.provider_item_id
+		`SELECT l.service_id, l.tmdb_id, l.media_type, l.provider_item_id, l.section_id
 		 FROM library_index l JOIN services s ON s.id = l.service_id
 		 WHERE l.tmdb_id IS NOT NULL AND s.enabled = 1`)
 	if err != nil {
@@ -268,18 +278,18 @@ func (s *Store) LibraryMembers(ctx context.Context) (map[int64]map[TitleKey]stri
 	}
 	defer rows.Close()
 
-	members := map[int64]map[TitleKey]string{}
+	members := map[int64]map[TitleKey]LibraryMember{}
 	for rows.Next() {
 		var serviceID int64
 		var k TitleKey
-		var providerItemID string
-		if err := rows.Scan(&serviceID, &k.TMDBID, &k.MediaType, &providerItemID); err != nil {
+		var m LibraryMember
+		if err := rows.Scan(&serviceID, &k.TMDBID, &k.MediaType, &m.ProviderItemID, &m.SectionID); err != nil {
 			return nil, fmt.Errorf("load library members: %w", err)
 		}
 		if members[serviceID] == nil {
-			members[serviceID] = map[TitleKey]string{}
+			members[serviceID] = map[TitleKey]LibraryMember{}
 		}
-		members[serviceID][k] = providerItemID
+		members[serviceID][k] = m
 	}
 	return members, rows.Err()
 }

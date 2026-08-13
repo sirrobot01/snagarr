@@ -7,9 +7,9 @@ import (
 )
 
 type userRef struct {
-	ID          int64      `json:"id"`
-	DisplayName string     `json:"display_name"`
-	Role        store.Role `json:"role"`
+	ID       int64      `json:"id"`
+	Username string     `json:"username"`
+	Role     store.Role `json:"role"`
 }
 
 type candidateDTO struct {
@@ -56,7 +56,7 @@ func newItemDTO(it store.Item) itemDTO {
 		Runtime: nullableCount(it.Runtime), Genres: it.Genres,
 	}
 	if it.CapturedBy != 0 {
-		dto.CapturedBy = &userRef{ID: it.CapturedBy, DisplayName: it.CapturedByName, Role: it.CapturedByRole}
+		dto.CapturedBy = &userRef{ID: it.CapturedBy, Username: it.CapturedByUsername, Role: it.CapturedByRole}
 	}
 	return dto
 }

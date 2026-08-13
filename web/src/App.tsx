@@ -21,9 +21,20 @@ const Setup = lazy(() => import('./routes/Setup'));
 function Loading() {
   return (
     <p className="sg-k sg-pad py-6" role="status">
-      LOADING…
+      Loading…
     </p>
   );
+}
+
+function SetupRoute({ admin, loading }: { admin: boolean; loading: boolean }) {
+  const [, navigate] = useLocation();
+
+  useEffect(() => {
+    if (!loading && !admin) navigate('/', { replace: true });
+  }, [admin, loading, navigate]);
+
+  if (loading || !admin) return <Loading />;
+  return <Setup />;
 }
 
 export function App() {
@@ -60,10 +71,10 @@ function Shell() {
   const counts = status.data?.counts;
   const footer =
     counts && counts.needs_review > 0
-      ? `${counts.needs_review} IN NEEDS REVIEW`
+      ? `${counts.needs_review} in Needs Review`
       : status.data?.sync?.collection_at
-        ? `SNAGGED COLLECTION SYNCED ${relativeTime(status.data.sync.collection_at)}`
-        : 'SNAGGED COLLECTION NOT SYNCED YET';
+        ? `Snagged collection synced ${relativeTime(status.data.sync.collection_at)}`
+        : 'Snagged collection not synced yet';
 
   return (
     <div className="sg-shell">
@@ -79,7 +90,9 @@ function Shell() {
               {/* Every member owns services now, so settings is not admin-only.
                   The page itself hides the install-wide cards from a member. */}
               <Route path="/settings" component={Settings} />
-              {admin && <Route path="/setup" component={Setup} />}
+              <Route path="/setup">
+                <SetupRoute admin={admin} loading={me.isPending} />
+              </Route>
               <Route>
                 <div className="sg-pad py-8">
                   <h3>Not found</h3>

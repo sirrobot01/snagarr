@@ -32,7 +32,9 @@ export function LibraryFields({ id, kind, config, locked, ready, set }: Props<Li
         value={config.url ?? ''}
         locked={locked}
         inputMode="url"
+        type="url"
         placeholder={LIBRARY_URL[kind]}
+        description="The local or public address of your media server."
         onChange={(value) => set({ url: value })}
       />
       <TextField
@@ -40,6 +42,8 @@ export function LibraryFields({ id, kind, config, locked, ready, set }: Props<Li
         label="Token"
         value={config.token ?? ''}
         locked={locked}
+        type="password"
+        description="A server access token. Plex sign-in can fill this for you."
         onChange={(value) => set({ token: value })}
       />
       {/* Plex can hand the token over itself, which beats hunting for one in
@@ -54,6 +58,7 @@ export function LibraryFields({ id, kind, config, locked, ready, set }: Props<Li
         value={config.collection_name ?? ''}
         locked={locked}
         placeholder="Snagged"
+        description="Optional collection Snagarr keeps updated in your library."
         onChange={(value) => set({ collection_name: value })}
       />
     </>
@@ -69,7 +74,9 @@ export function ArrFields({ id, kind, config, locked, ready, set }: Props<ArrKin
         value={config.url ?? ''}
         locked={locked}
         inputMode="url"
+        type="url"
         placeholder={ARR_URL[kind]}
+        description={`The address of your ${kind === 'radarr' ? 'Radarr' : 'Sonarr'} server.`}
         onChange={(value) => set({ url: value })}
       />
       <TextField
@@ -77,6 +84,8 @@ export function ArrFields({ id, kind, config, locked, ready, set }: Props<ArrKin
         label="API key"
         value={config.api_key ?? ''}
         locked={locked}
+        type="password"
+        description="Find this under Settings → General in the service."
         onChange={(value) => set({ api_key: value })}
       />
       <ArrOptionFields

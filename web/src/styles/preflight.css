@@ -1,1 +1,5 @@
+/* One variable face covers 100-900, so the weights this sheet asks for (650,
+   680, 800) render as authored instead of snapping to the nearest static cut. */
+@import '@fontsource-variable/geist';
+
 @tailwind base;

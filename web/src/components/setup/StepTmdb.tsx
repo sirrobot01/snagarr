@@ -1,3 +1,4 @@
+import { ExternalLink } from 'lucide-react';
 import type { CardProps } from '../settings/draft';
 import { TextField } from '../settings/fields';
 import { useTmdbTest } from '../settings/service';
@@ -29,7 +30,9 @@ export function StepTmdb({ settings, draft }: CardProps) {
         label="API key (v3)"
         value={current.api_key}
         locked={current.locked}
-        placeholder="eyJhbGciOi…"
+        type="password"
+        placeholder="Paste your TMDB API key"
+        description="The key is stored securely and used only to look up title metadata."
         onChange={(value) => draft.set('tmdb', { api_key: value })}
       />
       <TestRow
@@ -39,10 +42,14 @@ export function StepTmdb({ settings, draft }: CardProps) {
           run: () => void saveThenTest(),
         }}
       />
-      <p className="m-0 text-[13px] text-muted">
-        Every capture resolves through TMDB. Create a free key on themoviedb.org under Settings,
-        then API.
-      </p>
+      <a
+        className="inline-flex items-center gap-1.5 self-start text-[13px]"
+        href="https://www.themoviedb.org/settings/api"
+        target="_blank"
+        rel="noreferrer"
+      >
+        Get a free key from TMDB <ExternalLink aria-hidden="true" size={14} />
+      </a>
     </div>
   );
 }

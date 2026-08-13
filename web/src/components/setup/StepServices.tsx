@@ -1,3 +1,4 @@
+import { Plus } from 'lucide-react';
 import { useCreateService, useServices } from '../../lib/queries';
 import type { ServiceKind } from '../../lib/types';
 import { ServiceCard } from '../settings/ServiceCard';
@@ -19,7 +20,7 @@ export function StepServices({ kinds, empty }: Props) {
   if (services.isError) {
     return <ErrorState error={services.error} onRetry={() => void services.refetch()} />;
   }
-  if (!services.data) return <Loading label="LOADING SERVICES…" />;
+  if (!services.data) return <Loading label="Loading services…" />;
 
   const all = services.data.services;
   const mine = all.filter((service) => kinds.includes(service.kind));
@@ -39,6 +40,7 @@ export function StepServices({ kinds, empty }: Props) {
             disabled={create.isPending}
             onClick={() => create.mutate({ kind, name: freeName(all, kind) })}
           >
+            <Plus aria-hidden="true" size={16} />
             Add {kindLabel(kind)}
           </button>
         ))}

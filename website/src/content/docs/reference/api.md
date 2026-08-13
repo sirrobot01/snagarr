@@ -10,6 +10,9 @@ Base path `/api/v1`. All bodies are JSON. All timestamps are RFC 3339 UTC.
 | Method | Path | Role |
 |--------|------|------|
 | `GET` | `/health` | none |
+| `GET` | `/auth/status` | none |
+| `POST` | `/auth/register` | none, first account only |
+| `POST` | `/auth/login` | none |
 | `POST` | `/webhooks/{service}` | secret in query |
 | `GET` | `/me` | any token |
 | `GET` | `/status` | any token |
@@ -43,7 +46,19 @@ Base path `/api/v1`. All bodies are JSON. All timestamps are RFC 3339 UTC.
 Authorization: Bearer sngr_xxxxxxxxxxxxxxxxxxxxxxxx
 ```
 
-A token belongs to one user. Snagarr stores only its SHA-256 digest. First run prints one admin token and a setup URL that carries it in the fragment: `http://localhost:8080/#token=sngr_…`.
+A browser signs in with a username and password. A successful registration or
+login returns a bearer token to the web client; the credential never appears in
+the URL or server log. Passwords are stored as bcrypt hashes, and bearer tokens
+are stored as SHA-256 digests.
+
+The public registration route works only until an interactive account exists.
+The first registered user is always an administrator. On an upgrade from a
+token-only version, registration adds credentials to the existing administrator
+instead of discarding their data. `GET /auth/status` returns
+`{"initialized":false}` until registration succeeds.
+
+API clients, Shortcuts and bookmarklets use the same bearer header. A token
+belongs to one user and can be revoked independently.
 
 `/api/v1/webhooks/*` takes no bearer token. It authenticates with `?secret=`.
 
@@ -78,7 +93,7 @@ type Role = "admin" | "member";
 type Source = "web" | "shortcut" | "telegram" | "bookmarklet" | "api" | "cli";
 type ServiceKind = "plex" | "emby" | "jellyfin" | "radarr" | "sonarr" | "overseerr" | "ntfy";
 
-interface UserRef { id: number; display_name: string; role: Role }
+interface UserRef { id: number; username: string; role: Role }
 
 interface Item {
   id: number;
@@ -345,26 +360,26 @@ Connections come back fastest first. Store the head with the token in a `plex` s
 Not admin-gated. Every client calls it once at start-up to learn its role.
 
 ```json
-{ "id": 1, "display_name": "Mukhtar", "role": "admin" }
+{ "id": 1, "username": "mukhtar", "role": "admin" }
 ```
 
 ### `GET /users` · `POST /users`
 
 ```json
-{ "users": [ { "id": 1, "display_name": "Mukhtar", "role": "admin",
+{ "users": [ { "id": 1, "username": "mukhtar", "role": "admin",
                "telegram_user_id": null, "token_count": 3,
                "created_at": "2026-07-01T09:12:00Z" } ] }
 ```
 
 ```json
-{ "display_name": "Amina", "role": "member" }
+{ "username": "amina", "password": "temporary-password", "role": "member" }
 ```
 
-`telegram_user_id` is accepted and stored. Nothing reads it.
+`telegram_user_id` is optional and links Telegram captures to the account.
 
 ### `PATCH /users/{id}` · `DELETE /users/{id}`
 
-`PATCH` accepts the same fields as `POST`. Deleting a user keeps their items and nulls the attribution. It deletes their services and every index row those services own. The last admin cannot be deleted or demoted: `409 conflict`.
+`PATCH` accepts `role` and `telegram_user_id`. Deleting a user keeps their items and nulls the attribution. It deletes their services and every index row those services own. The last admin cannot be deleted or demoted: `409 conflict`.
 
 ### `GET /users/{id}/tokens` · `POST /users/{id}/tokens`
 

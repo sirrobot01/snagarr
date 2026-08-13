@@ -12,6 +12,7 @@ import (
 // LibraryItem is one title in a media server library.
 type LibraryItem struct {
 	ProviderItemID string
+	SectionID      string
 	TMDBID         int
 	IMDBID         string
 	TVDBID         int
@@ -25,6 +26,14 @@ type LibraryItem struct {
 type Section struct {
 	ID, Title string
 	Type      store.MediaType
+}
+
+// CollectionMember is one title to hold in a collection. Plex binds a collection
+// to a single section, so the section travels with the id; Emby's box sets take
+// any type and ignore it.
+type CollectionMember struct {
+	ID        string
+	SectionID string
 }
 
 // diffMembers compares the collection membership a server reports against the

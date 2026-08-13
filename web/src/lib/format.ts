@@ -12,19 +12,19 @@ export interface BadgeSpec {
 }
 
 const BADGES: Record<Status, BadgeSpec> = {
-  available: { label: 'IN LIBRARY', className: 'sg-lib' },
-  watched: { label: 'IN LIBRARY', className: 'sg-lib' },
-  monitored: { label: 'MONITORED', className: 'sg-mon' },
-  requested: { label: 'REQUESTED', className: 'sg-req' },
-  needs_review: { label: 'NEEDS REVIEW', className: 'sg-rev' },
-  new: { label: 'NEW', className: 'sg-new' },
+  available: { label: 'In library', className: 'sg-lib' },
+  watched: { label: 'In library', className: 'sg-lib' },
+  monitored: { label: 'Monitored', className: 'sg-mon' },
+  requested: { label: 'Requested', className: 'sg-req' },
+  needs_review: { label: 'Needs review', className: 'sg-rev' },
+  new: { label: 'New', className: 'sg-new' },
 };
 
 export function badgeFor(state: Status): BadgeSpec {
   return BADGES[state] ?? BADGES.new;
 }
 
-const MONTHS = ['JAN', 'FEB', 'MAR', 'APR', 'MAY', 'JUN', 'JUL', 'AUG', 'SEP', 'OCT', 'NOV', 'DEC'];
+const MONTHS = ['Jan', 'Feb', 'Mar', 'Apr', 'May', 'Jun', 'Jul', 'Aug', 'Sep', 'Oct', 'Nov', 'Dec'];
 
 export function shortDate(iso: string | null): string {
   if (!iso) return '';
@@ -34,15 +34,15 @@ export function shortDate(iso: string | null): string {
 }
 
 export function relativeTime(iso: string | null): string {
-  if (!iso) return 'NEVER';
+  if (!iso) return 'never';
   const seconds = Math.round((Date.now() - new Date(iso).getTime()) / 1000);
-  if (!Number.isFinite(seconds)) return 'NEVER';
-  if (seconds < 60) return 'JUST NOW';
+  if (!Number.isFinite(seconds)) return 'never';
+  if (seconds < 60) return 'just now';
   const minutes = Math.round(seconds / 60);
-  if (minutes < 60) return `${minutes} MIN AGO`;
+  if (minutes < 60) return `${minutes} min ago`;
   const hours = Math.round(minutes / 60);
-  if (hours < 24) return `${hours} H AGO`;
-  return `${Math.round(hours / 24)} D AGO`;
+  if (hours < 24) return `${hours} h ago`;
+  return `${Math.round(hours / 24)} d ago`;
 }
 
 export function itemMeta(item: Item): string {
@@ -57,11 +57,11 @@ export function itemMeta(item: Item): string {
 
 export function captureContext(item: Item): string {
   const parts = [
-    item.captured_by ? `SNAGGED BY ${item.captured_by.display_name}` : 'SNAGGED',
-    `FROM ${item.source}`,
+    item.captured_by ? `Snagged by ${item.captured_by.username}` : 'Snagged',
+    `from ${item.source}`,
     shortDate(item.captured_at),
   ];
-  return parts.filter(Boolean).join(' · ').toUpperCase();
+  return parts.filter(Boolean).join(' · ');
 }
 
 export function isUrl(value: string): boolean {

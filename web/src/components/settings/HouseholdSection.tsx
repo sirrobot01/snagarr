@@ -1,4 +1,5 @@
 import { useMutation } from '@tanstack/react-query';
+import { Bookmark, Play, UserPlus, Users } from 'lucide-react';
 import { useState } from 'react';
 import { api } from '../../lib/api';
 import { useStatus, useUsers } from '../../lib/queries';
@@ -19,22 +20,30 @@ export function HouseholdSection({ publicUrl, meId }: { publicUrl: string; meId:
 
   const sync = useMutation({
     mutationFn: api.sync,
-    onSuccess: () => pushToast('RECONCILE STARTED'),
-    onError: (error) => pushToast(`RECONCILE FAILED — ${errorText(error).toUpperCase()}`),
+    onSuccess: () => pushToast('Reconcile started'),
+    onError: (error) => pushToast(`Reconcile failed — ${errorText(error)}`),
   });
 
   const running = status.data?.sync.running === true || sync.isPending;
 
   return (
-    <section className="sg-pad flex flex-col gap-4 py-6">
-      <h4 className="m-0">Household &amp; tokens</h4>
+    <section className="sg-household sg-pad flex flex-col gap-4 py-6">
+      <div className="sg-section-heading">
+        <Users aria-hidden="true" size={20} />
+        <div>
+          <h3 className="m-0 text-[22px]">Household access</h3>
+          <p className="text-muted m-0 text-[13px]">
+            Manage who can sign in, their connected services, and capture tokens.
+          </p>
+        </div>
+      </div>
 
       {users.isError ? (
         <ErrorState error={users.error} onRetry={() => void users.refetch()} />
       ) : users.data ? (
         <HouseholdTable users={users.data.users} meId={meId} onInspect={setInspecting} />
       ) : (
-        <Loading label="LOADING HOUSEHOLD…" />
+        <Loading label="Loading household…" />
       )}
 
       <div className="flex flex-wrap items-center gap-2">
@@ -43,6 +52,7 @@ export function HouseholdSection({ publicUrl, meId }: { publicUrl: string; meId:
           className="btn btn-secondary min-h-[44px]"
           onClick={() => setAdding(true)}
         >
+          <UserPlus aria-hidden="true" size={16} />
           Add household member
         </button>
         <button
@@ -51,7 +61,8 @@ export function HouseholdSection({ publicUrl, meId }: { publicUrl: string; meId:
           disabled={bookmarklet.pending}
           onClick={bookmarklet.generate}
         >
-          {bookmarklet.pending ? 'GENERATING…' : 'Generate bookmarklet'}
+          <Bookmark aria-hidden="true" size={16} />
+          {bookmarklet.pending ? 'Generating…' : 'Generate bookmarklet'}
         </button>
         <button
           type="button"
@@ -59,6 +70,7 @@ export function HouseholdSection({ publicUrl, meId }: { publicUrl: string; meId:
           disabled={running}
           onClick={() => sync.mutate()}
         >
+          <Play aria-hidden="true" size={16} />
           {running ? 'Reconciling…' : 'Force reconcile now'}
         </button>
       </div>

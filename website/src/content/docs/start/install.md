@@ -19,10 +19,9 @@ volumes:
 
 ```sh
 docker compose up -d
-docker compose logs snagarr   # prints the admin token once
 ```
 
-Continue at [First run](/snagarr/start/first-run/).
+Open `http://localhost:8080`, then continue at [First run](/snagarr/start/first-run/).
 
 ### Bind mount
 
@@ -131,7 +130,7 @@ WantedBy=multi-user.target
 1. Add the user: `sudo useradd --system --no-create-home snagarr`.
 2. Reload systemd: `sudo systemctl daemon-reload`.
 3. Start the service: `sudo systemctl enable --now snagarr`.
-4. Read the admin token: `sudo journalctl -u snagarr`.
+4. Open the server in a browser and create the first administrator account.
 
 ## Files on disk
 

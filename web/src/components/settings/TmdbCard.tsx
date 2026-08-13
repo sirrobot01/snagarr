@@ -1,3 +1,4 @@
+import { Database, PlugZap } from 'lucide-react';
 import { useSaveSettings } from '../../lib/queries';
 import type { CardProps } from './draft';
 import { TextField } from './fields';
@@ -32,7 +33,9 @@ export function TmdbCard({ settings, draft }: CardProps) {
         name="TMDB"
         configured={current.configured}
         state={status.state}
-        label={pending ? 'TESTING…' : status.label}
+        label={pending ? 'Testing…' : status.label}
+        icon={Database}
+        note="Identifies titles, artwork, and metadata"
       />
 
       <TextField
@@ -40,7 +43,10 @@ export function TmdbCard({ settings, draft }: CardProps) {
         label="API key (v3)"
         value={current.api_key}
         locked={current.locked}
-        placeholder="eyJhbGciOi…"
+        type="password"
+        autoComplete="off"
+        placeholder="Paste your TMDB API key"
+        description="Use a TMDB API key (v3), available free from your TMDB account settings."
         onChange={(value) => draft.set('tmdb', { api_key: value })}
       />
 
@@ -51,7 +57,8 @@ export function TmdbCard({ settings, draft }: CardProps) {
         disabled={pending}
         onClick={() => void saveThenTest()}
       >
-        {failed ? 'RETEST' : 'Test connection'}
+        <PlugZap aria-hidden="true" size={16} />
+        {failed ? 'Retry' : 'Test connection'}
       </button>
     </section>
   );

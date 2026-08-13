@@ -115,6 +115,6 @@ export interface CardStatus {
 }
 
 export function cardStatus(ready: boolean, result: TestResult | null): CardStatus {
-  if (result) return { state: result.ok ? 'ok' : 'error', label: result.message.toUpperCase() };
-  return ready ? { state: 'ok', label: 'OK' } : { state: 'unset', label: 'NOT SET' };
+  if (result) return { state: result.ok ? 'ok' : 'error', label: result.message };
+  return ready ? { state: 'ok', label: 'Ready' } : { state: 'unset', label: 'Not set' };
 }

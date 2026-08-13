@@ -151,9 +151,16 @@ func (e *Reconciler) Run(ctx context.Context) error {
 		return err
 	}
 
-	e.syncArr(ctx, house)
-	e.syncRequests(ctx, house)
-	e.syncLibrary(ctx, house)
+	// Every service is reached over the network and a stalled one can hold its
+	// connection for minutes, so the three indexes are filled side by side and
+	// each one fans out over its own services. The pass then costs the slowest
+	// service rather than the sum of them all.
+	var wg sync.WaitGroup
+	wg.Add(3)
+	go func() { defer wg.Done(); e.syncArr(ctx, house) }()
+	go func() { defer wg.Done(); e.syncRequests(ctx, house) }()
+	go func() { defer wg.Done(); e.syncLibrary(ctx, house) }()
+	wg.Wait()
 
 	index, err := e.store.LoadStateIndex(ctx)
 	if err != nil {
@@ -190,55 +197,75 @@ func (e *Reconciler) household(ctx context.Context) (integration.Household, erro
 }
 
 func (e *Reconciler) syncArr(ctx context.Context, house integration.Household) {
+	var wg sync.WaitGroup
 	for _, r := range house.Radarrs {
-		items, err := r.Client.List(ctx)
-		if err != nil {
-			e.log.Warn("radarr sync failed", "service", r.Service.ID, "name", r.Service.Name, "error", err)
-			continue
-		}
-		if err := e.store.ReplaceArrIndex(ctx, r.Service.ID, toArrEntries(items)); err != nil {
-			e.log.Warn("radarr index write failed", "service", r.Service.ID, "error", err)
-			continue
-		}
-		e.mark(&e.state.ArrAt)
+		wg.Add(1)
+		go func() {
+			defer wg.Done()
+			e.syncArrService(ctx, "radarr", r.Service, r.Client.List)
+		}()
 	}
 	for _, s := range house.Sonarrs {
-		items, err := s.Client.List(ctx)
-		if err != nil {
-			e.log.Warn("sonarr sync failed", "service", s.Service.ID, "name", s.Service.Name, "error", err)
-			continue
-		}
-		if err := e.store.ReplaceArrIndex(ctx, s.Service.ID, toArrEntries(items)); err != nil {
-			e.log.Warn("sonarr index write failed", "service", s.Service.ID, "error", err)
-			continue
-		}
-		e.mark(&e.state.ArrAt)
+		wg.Add(1)
+		go func() {
+			defer wg.Done()
+			e.syncArrService(ctx, "sonarr", s.Service, s.Client.List)
+		}()
 	}
+	wg.Wait()
+}
+
+// syncArrService holds the half Radarr and Sonarr share. The two clients have no
+// common interface, so the caller passes the one method that differs.
+func (e *Reconciler) syncArrService(ctx context.Context, kind string, svc store.Service,
+	list func(context.Context) ([]integration.ArrItem, error)) {
+	items, err := list(ctx)
+	if err != nil {
+		e.log.Warn(kind+" sync failed", "service", svc.ID, "name", svc.Name, "error", err)
+		return
+	}
+	if err := e.store.ReplaceArrIndex(ctx, svc.ID, toArrEntries(items)); err != nil {
+		e.log.Warn(kind+" index write failed", "service", svc.ID, "error", err)
+		return
+	}
+	e.mark(&e.state.ArrAt)
 }
 
 func (e *Reconciler) syncRequests(ctx context.Context, house integration.Household) {
+	var wg sync.WaitGroup
 	for _, o := range house.Overseerrs {
-		requests, err := o.Client.List(ctx)
-		if err != nil {
-			e.log.Warn("overseerr sync failed", "service", o.Service.ID, "name", o.Service.Name, "error", err)
-			continue
-		}
-		entries := make([]store.RequestEntry, 0, len(requests))
-		for _, r := range requests {
-			entries = append(entries, store.RequestEntry{
-				RequestID: r.ID, TMDBID: int64(r.TMDBID), MediaType: r.Type, Status: r.Status,
-			})
-		}
-		if err := e.store.ReplaceRequests(ctx, o.Service.ID, entries); err != nil {
-			e.log.Warn("request index write failed", "service", o.Service.ID, "error", err)
-		}
+		wg.Add(1)
+		go func() {
+			defer wg.Done()
+			requests, err := o.Client.List(ctx)
+			if err != nil {
+				e.log.Warn("overseerr sync failed", "service", o.Service.ID, "name", o.Service.Name, "error", err)
+				return
+			}
+			entries := make([]store.RequestEntry, 0, len(requests))
+			for _, r := range requests {
+				entries = append(entries, store.RequestEntry{
+					RequestID: r.ID, TMDBID: int64(r.TMDBID), MediaType: r.Type, Status: r.Status,
+				})
+			}
+			if err := e.store.ReplaceRequests(ctx, o.Service.ID, entries); err != nil {
+				e.log.Warn("request index write failed", "service", o.Service.ID, "error", err)
+			}
+		}()
 	}
+	wg.Wait()
 }
 
 func (e *Reconciler) syncLibrary(ctx context.Context, house integration.Household) {
+	var wg sync.WaitGroup
 	for _, lib := range house.Libraries {
-		e.syncLibraryService(ctx, lib)
+		wg.Add(1)
+		go func() {
+			defer wg.Done()
+			e.syncLibraryService(ctx, lib)
+		}()
 	}
+	wg.Wait()
 }
 
 func (e *Reconciler) syncLibraryService(ctx context.Context, lib integration.Library) {
@@ -262,8 +289,8 @@ func (e *Reconciler) syncLibraryService(ctx context.Context, lib integration.Lib
 	entries := make([]store.LibraryEntry, 0, len(items))
 	for _, it := range items {
 		entries = append(entries, store.LibraryEntry{
-			ProviderItemID: it.ProviderItemID,
-			TMDBID:         int64(it.TMDBID), IMDBID: it.IMDBID, TVDBID: int64(it.TVDBID),
+			ProviderItemID: it.ProviderItemID, SectionID: it.SectionID,
+			TMDBID: int64(it.TMDBID), IMDBID: it.IMDBID, TVDBID: int64(it.TVDBID),
 			MediaType: it.Type, Title: it.Title, Year: it.Year, AddedAt: it.AddedAt,
 		})
 	}
@@ -345,8 +372,8 @@ func (e *Reconciler) notifyAvailable(ctx context.Context, house integration.Hous
 		return
 	}
 	body := it.Title + " is ready"
-	if it.CapturedByName != "" {
-		body += " — snagged by " + it.CapturedByName
+	if it.CapturedByUsername != "" {
+		body += " — snagged by " + it.CapturedByUsername
 	}
 	if !it.CapturedAt.IsZero() {
 		body += ", " + it.CapturedAt.Format("2 Jan")
@@ -392,30 +419,38 @@ func (e *Reconciler) syncCollection(ctx context.Context, house integration.House
 		return
 	}
 
+	var wg sync.WaitGroup
 	for _, lib := range house.Libraries {
 		if lib.Config.CollectionName == "" {
 			continue
 		}
 		titles := held[lib.Service.ID]
-		var members []string
+		var members []integration.CollectionMember
 		for _, it := range items {
 			if it.Status != store.StatusAvailable {
 				continue
 			}
-			if id, ok := titles[store.TitleKey{TMDBID: it.TMDBID, MediaType: it.MediaType}]; ok {
-				members = append(members, id)
+			if held, ok := titles[store.TitleKey{TMDBID: it.TMDBID, MediaType: it.MediaType}]; ok {
+				members = append(members, integration.CollectionMember{
+					ID: held.ProviderItemID, SectionID: held.SectionID,
+				})
 			}
 		}
 
-		if err := lib.Client.SyncCollection(ctx, lib.Config.CollectionName, members); err != nil {
-			e.log.Warn("collection sync failed", "service", lib.Service.ID,
-				"collection", lib.Config.CollectionName, "error", err)
-			continue
-		}
-		e.mark(&e.state.CollectionAt)
-		e.log.Debug("collection synced", "service", lib.Service.ID,
-			"collection", lib.Config.CollectionName, "members", len(members))
+		wg.Add(1)
+		go func() {
+			defer wg.Done()
+			if err := lib.Client.SyncCollection(ctx, lib.Config.CollectionName, members); err != nil {
+				e.log.Warn("collection sync failed", "service", lib.Service.ID,
+					"collection", lib.Config.CollectionName, "error", err)
+				return
+			}
+			e.mark(&e.state.CollectionAt)
+			e.log.Debug("collection synced", "service", lib.Service.ID,
+				"collection", lib.Config.CollectionName, "members", len(members))
+		}()
 	}
+	wg.Wait()
 }
 
 func (e *Reconciler) refreshEntities(ctx context.Context, settings config.Settings) {

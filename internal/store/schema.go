@@ -1,12 +1,13 @@
 package store
 
-// migrations are applied in order and tracked with PRAGMA user_version.
-// Never edit an applied migration; append a new one instead.
+// migrations are applied in order and tracked with PRAGMA user_version. The
+// project is still prerelease, so this initial schema is the current contract.
 var migrations = []string{
 	`
 CREATE TABLE users (
     id               INTEGER PRIMARY KEY,
-    display_name     TEXT    NOT NULL,
+    username         TEXT    NOT NULL COLLATE NOCASE UNIQUE,
+    password_hash    TEXT    NOT NULL,
     role             TEXT    NOT NULL,
     telegram_user_id INTEGER UNIQUE,
     created_at       TIMESTAMP NOT NULL
@@ -166,5 +167,12 @@ CREATE TABLE http_cache (
     expires_at TIMESTAMP NOT NULL
 );
 CREATE INDEX http_cache_expiry ON http_cache(expires_at);
+`,
+	// A Plex collection belongs to one library section, so a title has to carry
+	// the section it was found in. Existing rows learn theirs on the next full
+	// sweep, which dropping the sync state brings forward to the next pass.
+	`
+ALTER TABLE library_index ADD COLUMN section_id TEXT NOT NULL DEFAULT '';
+DELETE FROM settings WHERE key = 'sync_state';
 `,
 }

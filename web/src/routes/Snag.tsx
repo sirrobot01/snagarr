@@ -1,4 +1,5 @@
 import { useEffect, useRef, useState, type KeyboardEvent } from 'react';
+import { AlertCircle, History, Keyboard, LoaderCircle, SearchX } from 'lucide-react';
 import { useLocation } from 'wouter';
 
 import { CaptureBox } from '../components/CaptureBox';
@@ -32,9 +33,12 @@ export function Snag() {
 
   useEffect(() => setActive(0), [debounced]);
 
+  // Only a row that already made an item has somewhere to open, and it opens on
+  // that item rather than on the list around it. A title sitting in the library
+  // that nobody snagged still needs snagging.
   function select(result: SearchResult) {
-    if (result.state === 'available' || result.state === 'watched' || result.item_id !== null) {
-      navigate('/list');
+    if (result.item_id !== null) {
+      navigate(`/list?item=${result.item_id}`);
       return;
     }
     snag.mutate({ result, query: typed });
@@ -79,20 +83,33 @@ export function Snag() {
       {!idle && (
         <>
           <div className="sg-pad flex items-center justify-between gap-3 border-b border-line py-[9px]">
-            <span className="sg-k">
+            <span className="sg-k flex items-center gap-2" aria-live="polite">
+              {busy && <LoaderCircle className="animate-spin" aria-hidden="true" size={13} />}
               {short
-                ? 'KEEP TYPING'
+                ? 'Type at least 2 characters'
                 : busy
-                  ? 'SEARCHING…'
-                  : `${results.length} RESULTS · LIBRARY FIRST`}
+                  ? 'Searching…'
+                  : `${results.length} ${results.length === 1 ? 'result' : 'results'} · Library first`}
             </span>
-            <span className="sg-k hidden md:inline">↑↓ MOVE · ⏎ SNAG</span>
+            <span className="sg-k hidden items-center gap-1.5 md:flex">
+              <Keyboard aria-hidden="true" size={14} /> ↑↓ Navigate · Enter to snag
+            </span>
           </div>
 
-          {search.isError && <p className="sg-k sg-pad py-4">SEARCH UNAVAILABLE — RETRYING</p>}
+          {search.isError && (
+            <p className="sg-k sg-pad flex items-center gap-2 py-4" role="status">
+              <AlertCircle aria-hidden="true" size={15} /> Search is unavailable. Retrying…
+            </p>
+          )}
 
           {!short && !busy && !search.isError && results.length === 0 && (
-            <p className="sg-k sg-pad py-4">NO MATCHES</p>
+            <div className="sg-pad flex items-center gap-3 py-6">
+              <SearchX className="text-muted" aria-hidden="true" size={20} />
+              <div>
+                <p className="m-0 font-heading font-extrabold">No matches for “{typed}”</p>
+                <p className="text-muted m-0 text-[13px]">Try a shorter title or paste a link.</p>
+              </div>
+            </div>
           )}
 
           {results.map((result, index) => (
@@ -110,12 +127,24 @@ export function Snag() {
         <>
           <NeedsReview items={needsReview} onSearchManually={setQuery} />
 
-          {items.isPending && <p className="sg-k sg-pad py-6">LOADING…</p>}
-          {items.isError && <p className="sg-k sg-pad py-6">LIST UNAVAILABLE — RETRYING</p>}
+          {items.isPending && (
+            <p className="sg-k sg-pad flex items-center gap-2 py-6" role="status">
+              <LoaderCircle className="animate-spin" aria-hidden="true" size={14} /> Loading your
+              snags…
+            </p>
+          )}
+          {items.isError && (
+            <p className="sg-k sg-pad flex items-center gap-2 py-6" role="status">
+              <AlertCircle aria-hidden="true" size={14} /> Your list is unavailable. Retrying…
+            </p>
+          )}
 
           {recent.length > 0 && (
             <>
-              <p className="sg-k sg-pad border-b border-line py-[9px]">RECENT SNAGS</p>
+              <div className="sg-section-label sg-pad">
+                <History aria-hidden="true" size={15} />
+                <span>Recently snagged</span>
+              </div>
               {recent.slice(0, 12).map((item) => (
                 <ItemRow key={item.id} item={item} onSelect={() => navigate('/list')} />
               ))}

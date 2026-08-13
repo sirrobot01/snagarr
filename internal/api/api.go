@@ -37,6 +37,9 @@ func (s *Server) Handler() http.Handler {
 	r.Route("/api/v1", func(r chi.Router) {
 		r.Use(allowCrossOrigin)
 		r.Get("/health", s.health)
+		r.Get("/auth/status", s.authStatus)
+		r.Post("/auth/register", s.register)
+		r.Post("/auth/login", s.login)
 		// Webhook senders authenticate with a shared secret in the query
 		// string, because Radarr, Tautulli and Emby cannot all set headers.
 		r.Post("/webhooks/{service}", s.webhook)
@@ -98,7 +101,7 @@ func (s *Server) health(w http.ResponseWriter, _ *http.Request) {
 
 func (s *Server) me(w http.ResponseWriter, r *http.Request) {
 	u := userFrom(r)
-	writeJSON(w, http.StatusOK, userRef{ID: u.ID, DisplayName: u.DisplayName, Role: u.Role})
+	writeJSON(w, http.StatusOK, userRef{ID: u.ID, Username: u.Username, Role: u.Role})
 }
 
 func (s *Server) status(w http.ResponseWriter, r *http.Request) {

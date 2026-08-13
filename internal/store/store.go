@@ -18,6 +18,10 @@ import (
 // ErrNotFound is returned by every lookup that addresses a single row.
 var ErrNotFound = errors.New("not found")
 
+// ErrConflict is returned when an atomic create can no longer be completed
+// because another request got there first.
+var ErrConflict = errors.New("conflict")
+
 // Store is the database handle. It is safe for concurrent use.
 type Store struct {
 	db  *sql.DB
@@ -59,6 +63,9 @@ func (s *Store) migrate() error {
 	var version int
 	if err := s.db.QueryRow("PRAGMA user_version").Scan(&version); err != nil {
 		return fmt.Errorf("read schema version: %w", err)
+	}
+	if version > len(migrations) {
+		return fmt.Errorf("database schema version %d is not supported by this prerelease build; recreate the development database", version)
 	}
 	for i := version; i < len(migrations); i++ {
 		tx, err := s.db.Begin()

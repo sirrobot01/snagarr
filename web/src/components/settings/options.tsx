@@ -1,3 +1,4 @@
+import { useEffect, useState } from 'react';
 import type { ArrKind, ServiceConfig } from '../../lib/types';
 import { SelectField, TextField } from './fields';
 import { useServiceOptions } from './service';
@@ -18,7 +19,7 @@ function toId(value: string): number {
 }
 
 function freeSpace(bytes: number): string {
-  return bytes > 0 ? ` · ${Math.round(bytes / 1e9)} GB FREE` : '';
+  return bytes > 0 ? ` · ${Math.round(bytes / 1e9)} GB free` : '';
 }
 
 /* Without stored credentials the live lookup cannot answer, so each field falls
@@ -84,45 +85,31 @@ export function SectionsField({ id, config, locked, ready, onChange }: Omit<Prop
   const options = useServiceOptions(id, ready);
   const sections = options.data?.sections ?? [];
   const selected = config.section_ids ?? [];
+  const joined = selected.join(', ');
+  const [value, setValue] = useState(joined);
 
-  if (sections.length === 0) {
-    return (
-      <TextField
-        id={`svc-${id}-sections`}
-        label="Section IDs"
-        value={selected.join(', ')}
-        locked={locked}
-        placeholder="1, 2"
-        onChange={(value) =>
-          onChange({ section_ids: value.split(',').map((part) => part.trim()).filter(Boolean) })
-        }
-      />
-    );
-  }
+  useEffect(() => setValue(joined), [id, joined]);
+
+  const discovered = sections.length > 0
+    ? ` Available: ${sections.map((section) => `${section.title} (${section.id})`).join(', ')}.`
+    : '';
 
   return (
-    <div className="field">
-      <label htmlFor={`svc-${id}-sections`}>Libraries to index</label>
-      <select
-        id={`svc-${id}-sections`}
-        className="input"
-        style={{ minHeight: 44 }}
-        multiple
-        size={Math.min(4, sections.length)}
-        value={selected}
-        disabled={locked}
-        onChange={(event) =>
-          onChange({
-            section_ids: Array.from(event.currentTarget.selectedOptions, (option) => option.value),
-          })
-        }
-      >
-        {sections.map((section) => (
-          <option key={section.id} value={section.id}>
-            {section.title} · {section.type}
-          </option>
-        ))}
-      </select>
-    </div>
+    <TextField
+      id={`svc-${id}-sections`}
+      label="Section IDs"
+      type="text"
+      inputMode="text"
+      value={value}
+      locked={locked}
+      placeholder="1, 2"
+      description={`Enter one or more IDs separated by commas.${discovered}`}
+      onChange={setValue}
+      onBlur={() =>
+        onChange({
+          section_ids: value.split(',').map((part) => part.trim()).filter(Boolean),
+        })
+      }
+    />
   );
 }

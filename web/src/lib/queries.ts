@@ -13,6 +13,7 @@ import type {
   SearchResponse,
   SearchResult,
   SendTarget,
+  Service,
   ServicePatch,
   SettingsPatch,
   UserRef,
@@ -130,7 +131,7 @@ function replaceItem(client: QueryClient, id: number, next: Item | null) {
 
 function failed(action: string, error: unknown) {
   const message = error instanceof ApiError ? error.message : 'network unreachable';
-  pushToast(`${action} FAILED — ${message}`.toUpperCase());
+  pushToast(`${action.charAt(0).toUpperCase()}${action.slice(1)} failed — ${message}`);
 }
 
 export function useSnag() {
@@ -168,8 +169,8 @@ export function useSnag() {
       markSearchRows(client, result.tmdb_id, item.id);
 
       const label = item.year ? `${item.title} (${item.year})` : item.title;
-      pushToast(`SNAGGED — ${label.toUpperCase()}`, {
-        label: 'UNDO',
+      pushToast(`Snagged — ${label}`, {
+        label: 'Undo',
         run: () => undoSnag(client, item, result.tmdb_id),
       });
     },
@@ -274,7 +275,7 @@ export function useCaptureQuery() {
       api.capture(/^https?:\/\//i.test(value) ? { url: value, source: 'web' } : { query: value, source: 'web' }),
     onError: (error) => failed('capture', error),
     onSuccess: (item) => {
-      pushToast(`SNAGGED — ${item.title.toUpperCase()}`);
+      pushToast(`Snagged — ${item.title}`);
       void client.invalidateQueries({ queryKey: ['items'] });
     },
   });
@@ -321,7 +322,7 @@ export function useUserServices(userId: number | null) {
 
 /* Creating, editing or deleting a service changes what the household can
    reach, so the status badges have to be refetched with the list. */
-function useServiceMutation<V>(action: string, run: (value: V) => Promise<unknown>) {
+function useServiceMutation<V, R = unknown>(action: string, run: (value: V) => Promise<R>) {
   const client = useQueryClient();
   return useMutation({
     mutationFn: run,
@@ -334,7 +335,7 @@ function useServiceMutation<V>(action: string, run: (value: V) => Promise<unknow
 }
 
 export function useCreateService() {
-  return useServiceMutation<NewService>('add service', api.createService);
+  return useServiceMutation<NewService, Service>('add service', api.createService);
 }
 
 export function useSaveService() {

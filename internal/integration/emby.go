@@ -108,6 +108,7 @@ func (e *Emby) Items(ctx context.Context, sectionIDs []string, since time.Time) 
 				if !ok {
 					continue
 				}
+				item.SectionID = parent
 				out = append(out, item)
 			}
 			if len(body.Items) < embyPageSize {
@@ -118,8 +119,15 @@ func (e *Emby) Items(ctx context.Context, sectionIDs []string, since time.Time) 
 	return out, nil
 }
 
-// SyncCollection makes the named collection hold exactly itemIDs.
-func (e *Emby) SyncCollection(ctx context.Context, name string, itemIDs []string) error {
+// SyncCollection makes the named collection hold exactly members. A box set
+// takes any type, so unlike Plex there is one collection whatever section a
+// title came from.
+func (e *Emby) SyncCollection(ctx context.Context, name string, members []CollectionMember) error {
+	itemIDs := make([]string, 0, len(members))
+	for _, m := range members {
+		itemIDs = append(itemIDs, m.ID)
+	}
+
 	id, err := e.findCollection(ctx, name)
 	if err != nil {
 		return err

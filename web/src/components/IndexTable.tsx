@@ -11,7 +11,8 @@ interface Props {
   selected: Set<number>;
   onToggle: (id: number) => void;
   onToggleAll: () => void;
-  onOpen: (item: Item) => void;
+  openId: number | null;
+  onOpen: (id: number | null) => void;
 }
 
 export function IndexTable({
@@ -21,6 +22,7 @@ export function IndexTable({
   selected,
   onToggle,
   onToggleAll,
+  openId,
   onOpen,
 }: Props) {
   return (
@@ -49,6 +51,7 @@ export function IndexTable({
               <button
                 type="button"
                 className="w-full min-w-0 truncate bg-transparent p-0 text-left text-inherit"
+                aria-label={`Open details for ${item.title}`}
               >
                 <b>{item.title}</b> <span className="text-muted">{item.year ?? ''}</span>
               </button>
@@ -74,21 +77,27 @@ export function IndexTable({
                 </td>
                 <td className="max-w-[1px]">
                   {desktop ? (
-                    <DetailPopover item={item} admin={admin}>
+                    <DetailPopover
+                      item={item}
+                      admin={admin}
+                      open={openId === item.id}
+                      onOpenChange={(next) => onOpen(next ? item.id : null)}
+                    >
                       {title}
                     </DetailPopover>
                   ) : (
                     <button
                       type="button"
                       className="w-full min-w-0 truncate bg-transparent p-0 text-left text-inherit"
-                      onClick={() => onOpen(item)}
+                      aria-label={`Open details for ${item.title}`}
+                      onClick={() => onOpen(item.id)}
                     >
                       <b>{item.title}</b> <span className="text-muted">{item.year ?? ''}</span>
                     </button>
                   )}
                 </td>
                 <td className="whitespace-nowrap">{shortDate(item.captured_at)}</td>
-                <td className="whitespace-nowrap">{item.captured_by?.display_name ?? '—'}</td>
+                <td className="whitespace-nowrap">{item.captured_by?.username ?? '—'}</td>
                 <td className="whitespace-nowrap">{item.source}</td>
                 <td className="text-right">
                   <Badge state={item.status} />

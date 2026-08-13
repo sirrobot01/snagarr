@@ -1,8 +1,10 @@
 package api
 
 import (
+	"errors"
 	"net/http"
 	"strconv"
+	"strings"
 	"time"
 
 	"github.com/go-chi/chi/v5"
@@ -12,7 +14,7 @@ import (
 
 type userDTO struct {
 	ID             int64      `json:"id"`
-	DisplayName    string     `json:"display_name"`
+	Username       string     `json:"username"`
 	Role           store.Role `json:"role"`
 	TelegramUserID *int64     `json:"telegram_user_id"`
 	TokenCount     int        `json:"token_count"`
@@ -21,7 +23,7 @@ type userDTO struct {
 
 func newUserDTO(u store.User) userDTO {
 	return userDTO{
-		ID: u.ID, DisplayName: u.DisplayName, Role: u.Role,
+		ID: u.ID, Username: u.Username, Role: u.Role,
 		TelegramUserID: nullableInt(u.TelegramUserID),
 		TokenCount:     u.TokenCount, CreatedAt: u.CreatedAt,
 	}
@@ -42,17 +44,15 @@ func (s *Server) listUsers(w http.ResponseWriter, r *http.Request) {
 
 func (s *Server) createUser(w http.ResponseWriter, r *http.Request) {
 	var req struct {
-		DisplayName    string     `json:"display_name"`
+		Username       string     `json:"username"`
+		Password       string     `json:"password"`
 		Role           store.Role `json:"role"`
 		TelegramUserID int64      `json:"telegram_user_id"`
 	}
 	if !decode(w, r, &req) {
 		return
 	}
-	if req.DisplayName == "" {
-		writeError(w, http.StatusBadRequest, codeBadRequest, "display_name is required")
-		return
-	}
+	req.Username = strings.TrimSpace(req.Username)
 	if req.Role == "" {
 		req.Role = store.RoleMember
 	}
@@ -60,8 +60,32 @@ func (s *Server) createUser(w http.ResponseWriter, r *http.Request) {
 		writeError(w, http.StatusBadRequest, codeBadRequest, "role must be admin or member")
 		return
 	}
+	if !usernamePattern.MatchString(req.Username) {
+		writeError(w, http.StatusBadRequest, codeBadRequest, "username must be 3–32 letters, numbers, dots, dashes, or underscores")
+		return
+	}
+	if req.Password == "" {
+		writeError(w, http.StatusBadRequest, codeBadRequest, "password is required")
+		return
+	}
+	if _, err := s.store.UserByUsername(r.Context(), req.Username); err == nil {
+		writeError(w, http.StatusConflict, codeConflict, "that username is already in use")
+		return
+	} else if !errors.Is(err, store.ErrNotFound) {
+		s.writeStoreError(w, err, "users")
+		return
+	}
+	passwordHash, err := hashPassword(req.Password)
+	if err != nil {
+		s.log.Error("password hashing failed", "error", err)
+		writeError(w, http.StatusInternalServerError, codeInternal, "user could not be created")
+		return
+	}
 
-	u := &store.User{DisplayName: req.DisplayName, Role: req.Role, TelegramUserID: req.TelegramUserID}
+	u := &store.User{
+		Username: req.Username, PasswordHash: passwordHash,
+		Role: req.Role, TelegramUserID: req.TelegramUserID,
+	}
 	if err := s.store.CreateUser(r.Context(), u); err != nil {
 		s.writeStoreError(w, err, "user")
 		return
@@ -75,7 +99,6 @@ func (s *Server) updateUser(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 	req := struct {
-		DisplayName    *string     `json:"display_name"`
 		Role           *store.Role `json:"role"`
 		TelegramUserID *int64      `json:"telegram_user_id"`
 	}{}
@@ -83,9 +106,6 @@ func (s *Server) updateUser(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
-	if req.DisplayName != nil {
-		u.DisplayName = *req.DisplayName
-	}
 	if req.TelegramUserID != nil {
 		u.TelegramUserID = *req.TelegramUserID
 	}

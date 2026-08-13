@@ -58,8 +58,8 @@ type Item struct {
 	ArchivedAt  time.Time
 	NotifiedAt  time.Time
 
-	CapturedByName string
-	CapturedByRole Role
+	CapturedByUsername string
+	CapturedByRole     Role
 
 	// Filled from the entity cache by the same query.
 	Overview string
@@ -114,7 +114,7 @@ func (s *Store) CreateItem(ctx context.Context, it *Item) error {
 const itemColumns = `i.id, i.tmdb_id, i.media_type, i.title, i.year, i.poster_path, i.status,
 	i.raw_input, i.source, i.source_url, i.note, i.captured_by, i.captured_at,
 	i.resolved_at, i.available_at, i.archived_at, i.notified_at,
-	u.display_name, u.role, e.overview, e.runtime, e.genres`
+	u.username, u.role, e.overview, e.runtime, e.genres`
 
 const itemFrom = ` FROM items i
 	LEFT JOIN users u ON u.id = i.captured_by
@@ -143,7 +143,7 @@ func scanItem(row interface{ Scan(...any) error }) (*Item, error) {
 	it.AvailableAt = available.Time
 	it.ArchivedAt = archived.Time
 	it.NotifiedAt = notified.Time
-	it.CapturedByName = name.String
+	it.CapturedByUsername = name.String
 	it.CapturedByRole = Role(role.String)
 	it.Overview = overview.String
 	it.Runtime = int(runtime.Int64)

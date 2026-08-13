@@ -18,10 +18,6 @@ export const CaptureBox = forwardRef<HTMLInputElement, Props>(function CaptureBo
   return (
     <section className="sg-region sg-pad pb-4 pt-4 md:pb-[18px] md:pt-[26px]">
       <div className="flex items-center gap-3">
-        <span className="sg-b sg-new sg-hint" aria-hidden="true">
-          /
-        </span>
-
         <input
           id={id}
           ref={ref}
@@ -33,7 +29,7 @@ export const CaptureBox = forwardRef<HTMLInputElement, Props>(function CaptureBo
           spellCheck={false}
           enterKeyHint="go"
           aria-label="Snag a title or paste a link"
-          placeholder="Snag anything…"
+          placeholder="Search a title or paste a link"
           value={value}
           onChange={(event) => onChange(event.target.value)}
           onKeyDown={onKeyDown}
@@ -41,9 +37,12 @@ export const CaptureBox = forwardRef<HTMLInputElement, Props>(function CaptureBo
           onBlur={() => onFocusChange(false)}
         />
 
-        <span className="sg-k hidden text-right md:block">
-          LOCAL INDEX
-          <br />+ TMDB
+        <span className="sg-search-source hidden items-center gap-2 md:flex">
+          <span>
+            Local library
+            <br />
+            + TMDB
+          </span>
         </span>
       </div>
 

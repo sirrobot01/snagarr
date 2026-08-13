@@ -81,12 +81,8 @@ func serve(args []string) error {
 	if err != nil {
 		return err
 	}
-	if err := bootstrapAdmin(ctx, db, settings, cfg, log); err != nil {
-		return err
-	}
-	// Integrations belong to a member, so the environment configures the admin
-	// created above. This runs after the bootstrap or there is nobody to own
-	// them on a first run.
+	// Existing installations may already have an admin to own environment
+	// integrations. On a fresh install these are seeded after web registration.
 	if err := settings.SeedServices(ctx, db); err != nil {
 		return err
 	}
@@ -121,39 +117,4 @@ func serve(args []string) error {
 	shutdownCtx, cancel := context.WithTimeout(context.Background(), 15*time.Second)
 	defer cancel()
 	return httpServer.Shutdown(shutdownCtx)
-}
-
-// bootstrapAdmin makes the first run self-serve: one admin, one token, and a
-// URL that carries the token so the operator never copies it by hand.
-func bootstrapAdmin(ctx context.Context, db *store.Store, settings *config.Manager, cfg config.Config, log *slog.Logger) error {
-	users, err := db.Users(ctx)
-	if err != nil {
-		return err
-	}
-	if len(users) > 0 {
-		return nil
-	}
-
-	admin := &store.User{DisplayName: "Admin", Role: store.RoleAdmin}
-	if err := db.CreateUser(ctx, admin); err != nil {
-		return err
-	}
-	_, secret, err := db.CreateToken(ctx, admin.ID, "Setup token")
-	if err != nil {
-		return err
-	}
-
-	base := settings.Get().General.PublicURL
-	if base == "" {
-		// Addr is usually just ":8080", which needs a host to be clickable.
-		host := cfg.Addr
-		if strings.HasPrefix(host, ":") {
-			host = "localhost" + host
-		}
-		base = "http://" + host
-	}
-	log.Info("created the admin user")
-	fmt.Printf("\n  Snagarr is ready. Open the setup URL to finish:\n\n    %s/#token=%s\n\n  Admin token: %s\n  Keep it safe — it is not shown again.\n\n",
-		base, secret, secret)
-	return nil
 }

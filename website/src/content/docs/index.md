@@ -57,7 +57,8 @@ Every index row belongs to a service. Disable a service and it stops answering. 
 
 ## Roles
 
-One shared list with attribution. No accounts, no passwords.
+One shared list with attribution. Each household member has an account, while
+roles decide who may change install-wide or destructive settings.
 
 | Action | `admin` | `member` |
 |--------|---------|----------|
@@ -83,6 +84,6 @@ A `member` that calls an admin route gets `403 forbidden`.
 ## Next
 
 - [Install](/snagarr/start/install/) — Docker, binary, systemd, reverse proxy.
-- [First run](/snagarr/start/first-run/) — the admin token and the setup wizard.
+- [First run](/snagarr/start/first-run/) — account registration and the setup wizard.
 - [Services](/snagarr/configure/services/) — who owns what.
 - [HTTP API](/snagarr/reference/api/) — every endpoint.

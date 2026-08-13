@@ -11,6 +11,7 @@ import (
 	"slices"
 	"strconv"
 	"strings"
+	"sync"
 	"time"
 )
 
@@ -117,15 +118,23 @@ type Resource struct {
 	Connections      []Connection
 }
 
-// Connection is one address a server answers on.
+// Connection is one address a server answers on. Reachable reports whether the
+// address answered from this host when the list was built.
 type Connection struct {
 	URI          string
 	Local, Relay bool
+	Reachable    bool
 }
 
+// probeWait caps how long one address has to answer before it is treated as
+// unreachable.
+const probeWait = 4 * time.Second
+
 // Resources lists the servers token can reach, so a caller can offer a choice
-// instead of asking for a URL. Connections come back in the order worth trying:
-// local, then remote, then the relay, which plex.tv rate limits.
+// instead of asking for a URL. plex.tv returns every address a server ever
+// advertised, so each one is probed and the list comes back in the order worth
+// trying: addresses that answered first, then local before remote, and the
+// relay last because plex.tv rate limits and throttles it.
 func (a *PlexAuth) Resources(ctx context.Context, token string) ([]Resource, error) {
 	rest := a.rest
 	rest.Header = a.rest.Header.Clone()
@@ -147,14 +156,17 @@ func (a *PlexAuth) Resources(ctx context.Context, token string) ([]Resource, err
 	}
 
 	rank := func(c Connection) int {
+		n := 1
 		switch {
-		case c.Relay:
-			return 2
 		case c.Local:
-			return 0
-		default:
-			return 1
+			n = 0
+		case c.Relay:
+			n = 2
 		}
+		if !c.Reachable {
+			n += 3
+		}
+		return n
 	}
 
 	var out []Resource
@@ -167,12 +179,37 @@ func (a *PlexAuth) Resources(ctx context.Context, token string) ([]Resource, err
 		for _, c := range r.Connections {
 			res.Connections = append(res.Connections, Connection{URI: c.URI, Local: c.Local, Relay: c.Relay})
 		}
-		slices.SortStableFunc(res.Connections, func(x, y Connection) int {
-			return cmp.Compare(rank(x), rank(y))
-		})
 		out = append(out, res)
 	}
+
+	var wg sync.WaitGroup
+	for i := range out {
+		for j := range out[i].Connections {
+			wg.Add(1)
+			go func(c *Connection) {
+				defer wg.Done()
+				c.Reachable = a.answers(ctx, c.URI, token)
+			}(&out[i].Connections[j])
+		}
+	}
+	wg.Wait()
+
+	for i := range out {
+		slices.SortStableFunc(out[i].Connections, func(x, y Connection) int {
+			return cmp.Compare(rank(x), rank(y))
+		})
+	}
 	return out, nil
+}
+
+// answers reports whether a Plex server replies on uri. Only the host running
+// snagarr can tell, because a local address routes from the same network and a
+// remote one does not.
+func (a *PlexAuth) answers(ctx context.Context, uri, token string) bool {
+	ctx, cancel := context.WithTimeout(ctx, probeWait)
+	defer cancel()
+	probe := client{BaseURL: uri, Header: http.Header{"X-Plex-Token": {token}}}
+	return probe.Get(ctx, "/identity", nil, nil) == nil
 }
 
 type plexPin struct {

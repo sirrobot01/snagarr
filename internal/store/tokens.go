@@ -32,11 +32,10 @@ type Token struct {
 // CreateToken issues a token for a user and returns it alongside the raw
 // secret. The secret is readable exactly once — it cannot be recovered later.
 func (s *Store) CreateToken(ctx context.Context, userID int64, name string) (*Token, string, error) {
-	buf := make([]byte, 20)
-	if _, err := rand.Read(buf); err != nil {
-		return nil, "", fmt.Errorf("generate token: %w", err)
+	secret, err := newTokenSecret()
+	if err != nil {
+		return nil, "", err
 	}
-	secret := TokenPrefix + strings.ToLower(base32.StdEncoding.WithPadding(base32.NoPadding).EncodeToString(buf))
 
 	t := &Token{
 		UserID:    userID,
@@ -54,6 +53,14 @@ func (s *Store) CreateToken(ctx context.Context, userID int64, name string) (*To
 		return nil, "", err
 	}
 	return t, secret, nil
+}
+
+func newTokenSecret() (string, error) {
+	buf := make([]byte, 20)
+	if _, err := rand.Read(buf); err != nil {
+		return "", fmt.Errorf("generate token: %w", err)
+	}
+	return TokenPrefix + strings.ToLower(base32.StdEncoding.WithPadding(base32.NoPadding).EncodeToString(buf)), nil
 }
 
 // Authenticate resolves a raw token to its owner and stamps the token as used.

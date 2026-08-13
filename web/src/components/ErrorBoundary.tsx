@@ -1,4 +1,5 @@
 import { Component, type ErrorInfo, type ReactNode } from 'react';
+import { AlertTriangle, RotateCw } from 'lucide-react';
 
 interface Props {
   children: ReactNode;
@@ -28,9 +29,12 @@ export class ErrorBoundary extends Component<Props, State> {
     if (!error) return this.props.children;
 
     return (
-      <div className="sg-pad py-8">
-        <span className="sg-k">SOMETHING BROKE</span>
-        <h3 className="mt-2">This screen failed to render.</h3>
+      <div className="sg-empty sg-pad flex flex-col items-start py-8">
+        <span className="sg-empty-icon" aria-hidden="true">
+          <AlertTriangle size={24} />
+        </span>
+        <span className="sg-k mt-3">Something went wrong</span>
+        <h3 className="mt-2">This screen couldn’t be displayed.</h3>
         <pre className="text-muted overflow-x-auto whitespace-pre-wrap text-[12px] leading-relaxed">
           {error.message}
         </pre>
@@ -39,6 +43,7 @@ export class ErrorBoundary extends Component<Props, State> {
           className="btn btn-secondary mt-3 min-h-[44px]"
           onClick={() => this.setState({ error: null })}
         >
+          <RotateCw aria-hidden="true" size={16} />
           Try again
         </button>
       </div>

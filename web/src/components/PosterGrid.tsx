@@ -8,7 +8,8 @@ interface Props {
   items: Item[];
   admin: boolean;
   desktop: boolean;
-  onOpen: (item: Item) => void;
+  openId: number | null;
+  onOpen: (id: number | null) => void;
 }
 
 function Cell({ item }: { item: Item }) {
@@ -24,18 +25,30 @@ function Cell({ item }: { item: Item }) {
   );
 }
 
-export function PosterGrid({ items, admin, desktop, onOpen }: Props) {
+export function PosterGrid({ items, admin, desktop, openId, onOpen }: Props) {
   return (
     <div className="sg-grid">
       {items.map((item) =>
         desktop ? (
-          <DetailPopover key={item.id} item={item} admin={admin}>
-            <button type="button" className="sg-cell">
+          <DetailPopover
+            key={item.id}
+            item={item}
+            admin={admin}
+            open={openId === item.id}
+            onOpenChange={(next) => onOpen(next ? item.id : null)}
+          >
+            <button type="button" className="sg-cell" aria-label={`Open details for ${item.title}`}>
               <Cell item={item} />
             </button>
           </DetailPopover>
         ) : (
-          <button key={item.id} type="button" className="sg-cell" onClick={() => onOpen(item)}>
+          <button
+            key={item.id}
+            type="button"
+            className="sg-cell"
+            aria-label={`Open details for ${item.title}`}
+            onClick={() => onOpen(item.id)}
+          >
             <Cell item={item} />
           </button>
         ),

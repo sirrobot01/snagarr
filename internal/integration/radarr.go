@@ -77,19 +77,13 @@ func (r *RadarrClient) RootFolders(ctx context.Context) ([]RootFolder, error) {
 	return folders, nil
 }
 
-// Ping reports connectivity and how many movies Radarr monitors.
+// Ping reports connectivity.
 func (r *RadarrClient) Ping(ctx context.Context) (string, error) {
-	items, err := r.List(ctx)
+	status, err := arrStatus(ctx, r.rest)
 	if err != nil {
 		return "", fmt.Errorf("radarr ping: %w", err)
 	}
-	monitored := 0
-	for _, m := range items {
-		if m.Monitored {
-			monitored++
-		}
-	}
-	return "OK · " + strconv.Itoa(monitored) + " monitored", nil
+	return status, nil
 }
 
 type radarrMovie struct {

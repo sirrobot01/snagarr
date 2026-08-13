@@ -109,7 +109,7 @@ func (m *Manager) SeedServices(ctx context.Context, s *store.Store) error {
 			break
 		}
 	}
-	// Nobody to own them yet. The first run creates the admin, then seeds.
+	// Nobody to own them yet. Web registration creates the admin, then seeds.
 	if admin < 0 {
 		return nil
 	}

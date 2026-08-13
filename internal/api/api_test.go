@@ -49,7 +49,7 @@ func newHarness(t *testing.T) *harness {
 	h := &harness{store: db, server: httptest.NewServer(handler)}
 	t.Cleanup(h.server.Close)
 
-	h.admin = &store.User{DisplayName: "Mukhtar", Role: store.RoleAdmin}
+	h.admin = &store.User{Username: "Mukhtar", Role: store.RoleAdmin}
 	if err := db.CreateUser(ctx, h.admin); err != nil {
 		t.Fatalf("create admin: %v", err)
 	}
@@ -57,13 +57,34 @@ func newHarness(t *testing.T) *harness {
 		t.Fatalf("admin token: %v", err)
 	}
 
-	h.member = &store.User{DisplayName: "Amina", Role: store.RoleMember}
+	h.member = &store.User{Username: "Amina", Role: store.RoleMember}
 	if err := db.CreateUser(ctx, h.member); err != nil {
 		t.Fatalf("create member: %v", err)
 	}
 	if _, h.memberToken, err = db.CreateToken(ctx, h.member.ID, "member"); err != nil {
 		t.Fatalf("member token: %v", err)
 	}
+	return h
+}
+
+func newEmptyHarness(t *testing.T) *harness {
+	t.Helper()
+	ctx := context.Background()
+	db, err := store.Open(filepath.Join(t.TempDir(), "snagarr.db"), make([]byte, 32))
+	if err != nil {
+		t.Fatalf("open store: %v", err)
+	}
+	t.Cleanup(func() { db.Close() })
+	settings, err := config.NewManager(ctx, db)
+	if err != nil {
+		t.Fatalf("settings: %v", err)
+	}
+	log := slog.New(slog.NewTextHandler(io.Discard, nil))
+	reconciler := engine.NewReconciler(db, settings, log)
+	handler := New(db, settings, engine.NewResolver(db, log), reconciler,
+		http.NotFoundHandler(), log).Handler()
+	h := &harness{store: db, server: httptest.NewServer(handler)}
+	t.Cleanup(h.server.Close)
 	return h
 }
 
@@ -132,6 +153,110 @@ func TestHealthNeedsNoToken(t *testing.T) {
 	}
 }
 
+func TestFirstRunRegistrationAndLogin(t *testing.T) {
+	h := newEmptyHarness(t)
+
+	status := h.do(t, http.MethodGet, "/api/v1/auth/status", "", nil)
+	if status.StatusCode != http.StatusOK {
+		t.Fatalf("GET auth status = %d, want 200", status.StatusCode)
+	}
+	if got := decodeBody[map[string]bool](t, status)["initialized"]; got {
+		t.Fatal("fresh installation reports initialized")
+	}
+
+	register := h.do(t, http.MethodPost, "/api/v1/auth/register", "", map[string]any{
+		"username": "mukhtar", "password": "x",
+	})
+	if register.StatusCode != http.StatusCreated {
+		t.Fatalf("POST register = %d, want 201", register.StatusCode)
+	}
+	created := decodeBody[struct {
+		Token string  `json:"token"`
+		User  userRef `json:"user"`
+	}](t, register)
+	if !strings.HasPrefix(created.Token, store.TokenPrefix) {
+		t.Errorf("registration token = %q, want Snagarr token", created.Token)
+	}
+	if created.User.Role != store.RoleAdmin || created.User.Username != "mukhtar" {
+		t.Errorf("registered user = %+v, want first admin", created.User)
+	}
+	if resp := h.do(t, http.MethodGet, "/api/v1/me", created.Token, nil); resp.StatusCode != http.StatusOK {
+		t.Errorf("registration session cannot authenticate: %d", resp.StatusCode)
+	}
+
+	second := h.do(t, http.MethodPost, "/api/v1/auth/register", "", map[string]any{
+		"username": "someone", "password": "another-long-password",
+	})
+	if second.StatusCode != http.StatusConflict {
+		t.Errorf("second registration = %d, want 409", second.StatusCode)
+	}
+
+	login := h.do(t, http.MethodPost, "/api/v1/auth/login", "", map[string]any{
+		"username": "MUKHTAR", "password": "x",
+	})
+	if login.StatusCode != http.StatusOK {
+		t.Fatalf("POST login = %d, want 200", login.StatusCode)
+	}
+	session := decodeBody[map[string]any](t, login)
+	if token, _ := session["token"].(string); !strings.HasPrefix(token, store.TokenPrefix) {
+		t.Errorf("login token = %q, want Snagarr token", token)
+	}
+
+	bad := h.do(t, http.MethodPost, "/api/v1/auth/login", "", map[string]any{
+		"username": "mukhtar", "password": "wrong-password",
+	})
+	if bad.StatusCode != http.StatusUnauthorized {
+		t.Errorf("wrong password = %d, want 401", bad.StatusCode)
+	}
+}
+
+func TestRegistrationValidation(t *testing.T) {
+	h := newEmptyHarness(t)
+	tests := []struct {
+		name string
+		body map[string]any
+	}{
+		{"bad username", map[string]any{"username": "no spaces", "password": "anything"}},
+		{"empty password", map[string]any{"username": "mukhtar", "password": ""}},
+	}
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			if resp := h.do(t, http.MethodPost, "/api/v1/auth/register", "", tt.body); resp.StatusCode != http.StatusBadRequest {
+				t.Errorf("POST register = %d, want 400", resp.StatusCode)
+			}
+		})
+	}
+}
+
+func TestAdminCanCreatePasswordAccount(t *testing.T) {
+	h := newHarness(t)
+	longPassword := strings.Repeat("long password ", 50)
+	created := h.do(t, http.MethodPost, "/api/v1/users", h.adminToken, map[string]any{
+		"username": "tomi", "password": longPassword, "role": "member",
+	})
+	if created.StatusCode != http.StatusCreated {
+		t.Fatalf("POST user = %d, want 201", created.StatusCode)
+	}
+	user := decodeBody[userDTO](t, created)
+	if user.Username != "tomi" || user.Role != store.RoleMember {
+		t.Errorf("created user = %+v", user)
+	}
+
+	login := h.do(t, http.MethodPost, "/api/v1/auth/login", "", map[string]any{
+		"username": "tomi", "password": longPassword,
+	})
+	if login.StatusCode != http.StatusOK {
+		t.Errorf("new member login = %d, want 200", login.StatusCode)
+	}
+
+	duplicate := h.do(t, http.MethodPost, "/api/v1/users", h.adminToken, map[string]any{
+		"username": "TOMI", "password": "another-passphrase", "role": "member",
+	})
+	if duplicate.StatusCode != http.StatusConflict {
+		t.Errorf("duplicate username = %d, want 409", duplicate.StatusCode)
+	}
+}
+
 func TestMembersCannotReachAdminRoutes(t *testing.T) {
 	h := newHarness(t)
 
@@ -174,7 +299,7 @@ func TestCaptureParksUnresolvableInput(t *testing.T) {
 	if got.Source != store.SourceTelegram {
 		t.Errorf("source = %q, want telegram", got.Source)
 	}
-	if got.CapturedBy == nil || got.CapturedBy.DisplayName != "Amina" {
+	if got.CapturedBy == nil || got.CapturedBy.Username != "Amina" {
 		t.Errorf("captured_by = %+v, want Amina attributed", got.CapturedBy)
 	}
 }

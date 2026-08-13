@@ -1,11 +1,13 @@
-import { useState } from 'react';
+import { useEffect, useState } from 'react';
+import { AlertCircle, Grid2X2, Inbox, List as ListIcon, LoaderCircle, RotateCw } from 'lucide-react';
+import { useSearch } from 'wouter';
 
 import { DetailSheet } from '../components/DetailSheet';
 import { IndexTable } from '../components/IndexTable';
 import { PosterGrid } from '../components/PosterGrid';
 import { SelectionBar } from '../components/SelectionBar';
 import { useIsDesktop } from '../hooks/useMediaQuery';
-import { isAdmin, useArchive, useItems, useMe, useSend } from '../lib/queries';
+import { isAdmin, useArchive, useItems, useMe, useSend, useStatus } from '../lib/queries';
 import type { Item, Status } from '../lib/types';
 
 type Chip = 'all' | 'ready' | 'pending' | 'reviewing' | 'archived';
@@ -32,7 +34,7 @@ export default function List() {
   const [chip, setChip] = useState<Chip>('all');
   const [view, setView] = useState<'grid' | 'index'>('grid');
   const [selected, setSelected] = useState<Set<number>>(new Set());
-  const [open, setOpen] = useState<Item | null>(null);
+  const [openId, setOpenId] = useState<number | null>(null);
 
   const desktop = useIsDesktop();
   const me = useMe();
@@ -40,8 +42,23 @@ export default function List() {
   const items = useItems(chip === 'archived');
   const send = useSend();
   const archive = useArchive();
+  const status = useStatus();
+
+  // /list?item=7 opens that item, which is how a search result reaches the
+  // detail it promised instead of dropping the reader on the list.
+  const query = useSearch();
+  useEffect(() => {
+    const asked = Number(new URLSearchParams(query).get('item'));
+    if (asked) setOpenId(asked);
+  }, [query]);
 
   const visible = (items.data?.items ?? []).filter((item) => matches(item, chip));
+  const open = visible.find((item) => item.id === openId) ?? null;
+
+  // A send target nobody has connected cannot work, so it is offered as
+  // unavailable rather than as a button that fails.
+  const services = status.data?.services;
+  const canSend = (services?.radarr ?? false) || (services?.sonarr ?? false);
 
   function toggle(id: number) {
     setSelected((prev) => {
@@ -64,51 +81,92 @@ export default function List() {
 
   return (
     <>
-      <div className="sg-region sg-pad flex flex-wrap items-center gap-2 py-[14px]">
-        {CHIPS.map(({ key, label }) => (
+      <div className="sg-region sg-pad flex flex-wrap items-center gap-3 py-[14px]">
+        <div className="flex flex-wrap items-center gap-2" aria-label="Filter your list">
+          {CHIPS.map(({ key, label }) => (
+            <button
+              key={key}
+              type="button"
+              className="sg-chip"
+              data-on={chip === key ? '1' : undefined}
+              aria-pressed={chip === key}
+              onClick={() => {
+                setChip(key);
+                setSelected(new Set());
+              }}
+            >
+              {label}
+            </button>
+          ))}
+        </div>
+
+        <span className="sg-k ml-auto">
+          {visible.length} {visible.length === 1 ? 'item' : 'items'}
+        </span>
+
+        <div className="sg-view-toggle" role="group" aria-label="List layout">
           <button
-            key={key}
             type="button"
-            className="sg-chip"
-            data-on={chip === key ? '1' : undefined}
-            aria-pressed={chip === key}
-            onClick={() => {
-              setChip(key);
-              setSelected(new Set());
-            }}
+            className="sg-view-button"
+            data-on={view === 'grid' ? '1' : undefined}
+            aria-pressed={view === 'grid'}
+            aria-label="Poster grid"
+            onClick={() => setView('grid')}
           >
-            {label}
+            <Grid2X2 aria-hidden="true" size={16} />
           </button>
-        ))}
-
-        <span className="sg-k ml-auto">{visible.length} ITEMS</span>
-
-        <button
-          type="button"
-          className="sg-chip"
-          aria-label={`Switch to ${view === 'grid' ? 'index' : 'grid'} view`}
-          onClick={() => setView(view === 'grid' ? 'index' : 'grid')}
-        >
-          {view === 'grid' ? 'GRID ↔ INDEX' : 'INDEX ↔ GRID'}
-        </button>
+          <button
+            type="button"
+            className="sg-view-button"
+            data-on={view === 'index' ? '1' : undefined}
+            aria-pressed={view === 'index'}
+            aria-label="Table view"
+            onClick={() => setView('index')}
+          >
+            <ListIcon aria-hidden="true" size={17} />
+          </button>
+        </div>
       </div>
 
-      {items.isPending && <p className="sg-k sg-pad py-6">LOADING…</p>}
+      {items.isPending && (
+        <p className="sg-k sg-pad flex items-center gap-2 py-6" role="status">
+          <LoaderCircle className="animate-spin" aria-hidden="true" size={14} /> Loading your list…
+        </p>
+      )}
       {items.isError && (
-        <div className="sg-pad py-6">
-          <p className="sg-k">LIST UNAVAILABLE</p>
+        <div className="sg-pad flex flex-col items-start gap-3 py-6">
+          <p className="sg-k m-0 flex items-center gap-2">
+            <AlertCircle aria-hidden="true" size={15} /> We couldn’t load your list
+          </p>
           <button type="button" className="btn btn-secondary mt-2" onClick={() => items.refetch()}>
+            <RotateCw aria-hidden="true" size={15} />
             Retry
           </button>
         </div>
       )}
 
       {!items.isPending && !items.isError && visible.length === 0 && (
-        <p className="sg-k sg-pad py-6">NOTHING HERE YET</p>
+        <section className="sg-empty sg-pad flex flex-col items-center py-10 text-center">
+          <span className="sg-empty-icon" aria-hidden="true">
+            <Inbox size={25} />
+          </span>
+          <h3 className="mt-3 text-[21px]">Nothing in {chip === 'all' ? 'your list' : chip}</h3>
+          <p className="text-muted m-0 max-w-[320px] text-[13px]">
+            {chip === 'archived'
+              ? 'Titles you archive will appear here.'
+              : 'Try another filter, or snag a title from the search page.'}
+          </p>
+        </section>
       )}
 
       {view === 'grid' ? (
-        <PosterGrid items={visible} admin={admin} desktop={desktop} onOpen={setOpen} />
+        <PosterGrid
+          items={visible}
+          admin={admin}
+          desktop={desktop}
+          openId={openId}
+          onOpen={setOpenId}
+        />
       ) : (
         <IndexTable
           items={visible}
@@ -117,7 +175,8 @@ export default function List() {
           selected={selected}
           onToggle={toggle}
           onToggleAll={toggleAll}
-          onOpen={setOpen}
+          openId={openId}
+          onOpen={setOpenId}
         />
       )}
 
@@ -125,6 +184,7 @@ export default function List() {
         <SelectionBar
           count={selected.size}
           admin={admin}
+          canSend={canSend}
           onArchive={() => applyToSelection((item) => archive.mutate({ item, value: true }))}
           onSend={() =>
             applyToSelection((item) =>
@@ -134,7 +194,7 @@ export default function List() {
         />
       )}
 
-      {!desktop && <DetailSheet item={open} admin={admin} onClose={() => setOpen(null)} />}
+      {!desktop && <DetailSheet item={open} admin={admin} onClose={() => setOpenId(null)} />}
     </>
   );
 }

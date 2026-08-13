@@ -1,39 +1,28 @@
 ---
 title: First run
-description: Read the admin token, open the setup URL, complete the wizard, then issue and revoke tokens.
+description: Create the first administrator in the browser, complete the setup wizard, then invite your household.
 ---
 
-## The admin token
+## Create the administrator
 
-At first start Snagarr creates the admin user, issues one token and prints both to standard output:
+Start Snagarr, then open its web address. The default local address is:
 
 ```
-  Snagarr is ready. Open the setup URL to finish:
-
-    http://localhost:8080/#token=sngr_a1b2c3d4e5f6g7h8i9j0k1l2m3n4o5p6
-
-  Admin token: sngr_a1b2c3d4e5f6g7h8i9j0k1l2m3n4o5p6
-  Keep it safe — it is not shown again.
+http://localhost:8080
 ```
 
-| Deployment | Read the token with |
-|------------|---------------------|
-| Compose | `docker compose logs snagarr` |
-| Plain Docker | `docker logs snagarr` |
-| systemd | `sudo journalctl -u snagarr` |
+An empty installation opens the registration screen. Choose a username and
+password. The first account is always an administrator. Registration closes as
+soon as that account exists, so another visitor cannot create a second initial
+administrator.
 
-Snagarr stores only the SHA-256 digest of a token. The raw value is printed once and cannot be recovered. Issue a replacement from the settings UI if you lose it.
+After registration, the browser receives a private session and takes you into
+Snagarr. There is no setup secret in the server log and no credential in the
+URL. On another browser, use the sign-in screen with the username and password
+you created.
 
-The setup URL uses `general.public_url` when that setting is set. Otherwise it uses the listen address, with `localhost` in place of an empty host.
-
-## Open the web app
-
-1. Open the setup URL. The client reads the token from the URL fragment, saves it and removes it from the URL.
-2. The app opens on the **Snag** screen.
-
-Without a token, the app shows a token box. Paste a token there. It is kept in browser local storage under the key `snagarr.token`.
-
-To change the token later, open `<public url>/#token=<new token>`.
+The browser session is stored locally on that device. Use **Sign out** from the
+account menu before leaving a shared device.
 
 ## Setup wizard
 
@@ -44,7 +33,7 @@ Open `/setup` for the four-step wizard. Every step can be skipped and done later
 | 1 | Paste a TMDB API key (v3) from [themoviedb.org](https://www.themoviedb.org/settings/api) | Yes. Without it, captures save but never resolve. |
 | 2 | Add a media server: Plex, Emby or Jellyfin | No. Gives the library badges and the `Snagged` collection. |
 | 3 | Add Radarr and Sonarr | No. Needed to send titles. |
-| 4 | Take a household token | No. |
+| 4 | Review the connections and optionally create a client token | No. |
 
 Step 1 writes a setting. Steps 2 and 3 create [services](/snagarr/configure/services/) you own. A service must exist before it can be tested, so each card saves itself.
 
@@ -62,15 +51,15 @@ Add a member in the settings page, or through the API:
 curl -X POST http://localhost:8080/api/v1/users \
   -H "Authorization: Bearer sngr_your_admin_token" \
   -H "Content-Type: application/json" \
-  -d '{"display_name":"Amina","role":"member"}'
+  -d '{"username":"amina","password":"temporary-password","role":"member"}'
 ```
 
 Roles are `admin` and `member`. See the role table in the [Introduction](/snagarr/#roles). The last admin cannot be deleted or demoted; the API answers `409 conflict`. Deleting a user keeps their items and nulls the attribution, and removes their services with every index row those services own.
 
 Every member connects their own Radarr, Sonarr, Overseerr, media server and ntfy:
 
-1. Give the member a token.
-2. The member opens the app and goes to **Settings → My services**.
+1. Give the member the username and password you created for them.
+2. The member signs in and goes to **Settings → My services**.
 3. The member adds what they own.
 
 A member with no service of a kind cannot send to that kind. Your services are not shared. See [Services](/snagarr/configure/services/).
@@ -83,7 +72,7 @@ Four ways to get one:
 
 | Source | Steps |
 |--------|-------|
-| First run | Read the admin token from the log. |
+| Browser sign-in | Snagarr creates a browser session automatically; its secret is never displayed. |
 | Setup wizard | Last step, **Create a household token**. |
 | Settings page | **Generate bookmarklet** issues a token named `Bookmarklet` inside the generated code. |
 | API | `POST /api/v1/users/{id}/tokens` |

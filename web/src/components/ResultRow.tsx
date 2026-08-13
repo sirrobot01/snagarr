@@ -1,3 +1,4 @@
+import { ChevronRight, Plus } from 'lucide-react';
 import { Badge } from './Badge';
 import { Poster } from './Poster';
 import type { SearchResult } from '../lib/types';
@@ -8,14 +9,17 @@ interface Props {
   onSelect: (result: SearchResult) => void;
 }
 
-function action(result: SearchResult): string {
-  if (result.state === 'available' || result.state === 'watched') return 'OPEN';
-  if (result.item_id !== null) return '✓';
-  return 'SNAG';
+// The badge already carries the library state, so the action only has to say
+// whether the row opens an item that exists or makes a new one.
+function action(result: SearchResult) {
+  if (result.item_id !== null) {
+    return { label: 'Open', icon: <ChevronRight aria-hidden="true" size={16} /> };
+  }
+  return { label: 'Snag', icon: <Plus aria-hidden="true" size={15} /> };
 }
 
 export function ResultRow({ result, active, onSelect }: Props) {
-  const label = action(result);
+  const next = action(result);
 
   return (
     <button
@@ -45,7 +49,9 @@ export function ResultRow({ result, active, onSelect }: Props) {
       </span>
 
       <Badge state={result.state} />
-      <span className="sg-row-action">{label}</span>
+      <span className="sg-row-action">
+        {next.label}
+      </span>
     </button>
   );
 }

@@ -1,4 +1,5 @@
 import { useEffect, useState } from 'react';
+import { CheckCircle2, ExternalLink, LoaderCircle, Server, X } from 'lucide-react';
 import { ApiError, api } from '../../lib/api';
 import type { PlexServer } from '../../lib/types';
 
@@ -9,6 +10,66 @@ type Phase =
   | { step: 'failed'; message: string };
 
 const POLL_MS = 2000;
+
+export function PlexServerPicker({
+  servers,
+  token,
+  onPicked,
+}: {
+  servers: PlexServer[];
+  token: string;
+  onPicked: (url: string, token: string) => void;
+}) {
+  if (servers.length === 0) {
+    return <p className="text-muted m-0 text-[13px]">This account reaches no Plex server.</p>;
+  }
+
+  return (
+    <div className="sg-plex-servers">
+      {servers.map((server) => (
+        <section className="sg-plex-server" key={server.client_identifier}>
+          <div className="sg-plex-server-head">
+            <Server aria-hidden="true" size={16} />
+            <strong>{server.name}</strong>
+            <span className="text-muted">
+              {server.connections.length} endpoint{server.connections.length === 1 ? '' : 's'}
+            </span>
+          </div>
+          <div className="sg-plex-endpoints">
+            {server.connections.length === 0 ? (
+              <p className="text-muted m-0 text-[12px]">No address was returned for this server.</p>
+            ) : (
+              server.connections.map((connection, index) => {
+                const route = connection.local ? 'Local' : connection.relay ? 'Relay' : 'Remote';
+                // The list arrives best-first, so the first address that
+                // answered is the one to take.
+                const best = connection.reachable && index === 0;
+                return (
+                  <button
+                    key={`${connection.uri}-${index}`}
+                    type="button"
+                    className="sg-plex-endpoint"
+                    data-best={best ? '1' : undefined}
+                    aria-label={`Use ${server.name} at ${connection.uri}`}
+                    onClick={() => onPicked(connection.uri, token)}
+                  >
+                    <span className="sg-plex-route" data-route={route.toLowerCase()}>
+                      {route}
+                    </span>
+                    <span className="sg-plex-uri">{connection.uri}</span>
+                    <span className="sg-plex-reach" data-reach={connection.reachable ? 'ok' : 'no'}>
+                      {best ? 'Recommended' : connection.reachable ? 'Answers' : 'No answer'}
+                    </span>
+                  </button>
+                );
+              })
+            )}
+          </div>
+        </section>
+      ))}
+    </div>
+  );
+}
 
 function reason(error: unknown): string {
   if (error instanceof ApiError && error.status === 404) {
@@ -76,14 +137,16 @@ export function PlexSignIn({ onPicked }: { onPicked: (url: string, token: string
   if (phase.step === 'waiting') {
     return (
       <Panel>
-        <p className="sg-k m-0">
-          WAITING FOR PLEX — CODE {phase.code}. FINISH IN THE WINDOW THAT OPENED.
+        <p className="sg-k m-0 flex items-center gap-2">
+          <LoaderCircle className="animate-spin" aria-hidden="true" size={14} />
+          Waiting for Plex · Code {phase.code}. Finish in the window that opened.
         </p>
         <button
           type="button"
           className="btn btn-ghost min-h-[44px] self-start"
           onClick={() => setPhase({ step: 'idle' })}
         >
+          <X aria-hidden="true" size={15} />
           Cancel
         </button>
       </Panel>
@@ -93,25 +156,24 @@ export function PlexSignIn({ onPicked }: { onPicked: (url: string, token: string
   if (phase.step === 'picking') {
     return (
       <Panel>
-        <p className="sg-k m-0">SIGNED IN — CHOOSE A SERVER</p>
-        {phase.servers.length === 0 && (
-          <p className="text-muted m-0 text-[13px]">This account reaches no Plex server.</p>
-        )}
-        {phase.servers.map((server) => (
-          <button
-            key={server.client_identifier}
-            type="button"
-            className="btn btn-secondary min-h-[44px] self-start"
-            disabled={server.connections.length === 0}
-            onClick={() => {
-              onPicked(server.connections[0].uri, phase.token);
-              setPhase({ step: 'idle' });
-            }}
-          >
-            {server.name}
-            {server.connections[0] ? ` · ${server.connections[0].uri}` : ' · no address'}
-          </button>
-        ))}
+        <p className="sg-k m-0 flex items-center gap-2">
+          <CheckCircle2 aria-hidden="true" size={15} /> Signed in · Choose a server
+        </p>
+        <PlexServerPicker
+          servers={phase.servers}
+          token={phase.token}
+          onPicked={(url, token) => {
+            onPicked(url, token);
+            setPhase({ step: 'idle' });
+          }}
+        />
+        <button
+          type="button"
+          className="btn btn-ghost min-h-[44px] self-start"
+          onClick={() => setPhase({ step: 'idle' })}
+        >
+          Cancel
+        </button>
       </Panel>
     );
   }
@@ -125,9 +187,10 @@ export function PlexSignIn({ onPicked }: { onPicked: (url: string, token: string
         disabled={starting}
         onClick={() => void start()}
       >
-        {starting ? 'OPENING PLEX…' : 'Sign in with Plex'}
+        <ExternalLink aria-hidden="true" size={16} />
+        {starting ? 'Opening Plex…' : 'Sign in with Plex'}
       </button>
-      {phase.step === 'failed' && <p className="sg-k m-0">{phase.message.toUpperCase()}</p>}
+      {phase.step === 'failed' && <p className="sg-k sg-error m-0">{phase.message}</p>}
     </Panel>
   );
 }

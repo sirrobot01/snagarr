@@ -2,8 +2,6 @@ import { StrictMode } from 'react';
 import { createRoot } from 'react-dom/client';
 import { QueryClient, QueryClientProvider } from '@tanstack/react-query';
 
-import '@fontsource/archivo/400.css';
-import '@fontsource/archivo/800.css';
 import './styles/preflight.css';
 import './styles/modernist.css';
 import './styles/app.css';

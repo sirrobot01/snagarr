@@ -1,4 +1,5 @@
 import { useMutation, useQueryClient } from '@tanstack/react-query';
+import { KeyRound, Server, Trash2 } from 'lucide-react';
 import { api } from '../../lib/api';
 import { keys } from '../../lib/queries';
 import { pushToast } from '../../lib/toast';
@@ -33,19 +34,19 @@ export function HouseholdTable({ users, meId, onInspect }: Props) {
       return tokens.length;
     },
     onSuccess: (count) => {
-      pushToast(`REVOKED — ${count} TOKEN${count === 1 ? '' : 'S'}`);
+      pushToast(`Revoked ${count} token${count === 1 ? '' : 's'}`);
       refresh();
     },
-    onError: (error) => pushToast(`REVOKE FAILED — ${errorText(error).toUpperCase()}`),
+    onError: (error) => pushToast(`Revoke failed — ${errorText(error)}`),
   });
 
   const remove = useMutation({
     mutationFn: (userId: number) => api.deleteUser(userId),
     onSuccess: () => {
-      pushToast('MEMBER REMOVED');
+      pushToast('Member removed');
       refresh();
     },
-    onError: (error) => pushToast(`REMOVE FAILED — ${errorText(error).toUpperCase()}`),
+    onError: (error) => pushToast(`Remove failed — ${errorText(error)}`),
   });
 
   const busy = revoke.isPending || remove.isPending;
@@ -54,7 +55,7 @@ export function HouseholdTable({ users, meId, onInspect }: Props) {
     <table className="table">
       <thead>
         <tr>
-          <th>Name</th>
+          <th>Username</th>
           <th>Role</th>
           <th>Tokens</th>
           <th />
@@ -63,7 +64,10 @@ export function HouseholdTable({ users, meId, onInspect }: Props) {
       <tbody>
         {users.map((user) => (
           <tr key={user.id}>
-            <td className="font-heading font-extrabold">{user.display_name}</td>
+            <td>
+              <span className="block font-heading font-extrabold">@{user.username}</span>
+              {user.id === meId && <span className="sg-k">You</span>}
+            </td>
             <td>
               <span className={`sg-b ${user.role === 'admin' ? 'sg-lib' : 'sg-new'}`}>
                 {user.role}
@@ -77,6 +81,7 @@ export function HouseholdTable({ users, meId, onInspect }: Props) {
                 disabled={busy}
                 onClick={() => onInspect(user)}
               >
+                <Server aria-hidden="true" size={15} />
                 Services
               </button>
               <button
@@ -84,11 +89,12 @@ export function HouseholdTable({ users, meId, onInspect }: Props) {
                 className="btn btn-ghost min-h-[44px]"
                 disabled={busy || user.token_count === 0}
                 onClick={() => {
-                  if (window.confirm(`Revoke every token for ${user.display_name}?`)) {
+                  if (window.confirm(`Revoke every token for ${user.username}?`)) {
                     revoke.mutate(user.id);
                   }
                 }}
               >
+                <KeyRound aria-hidden="true" size={15} />
                 Revoke
               </button>
               {user.id !== meId && (
@@ -97,11 +103,12 @@ export function HouseholdTable({ users, meId, onInspect }: Props) {
                   className="btn btn-ghost min-h-[44px]"
                   disabled={busy}
                   onClick={() => {
-                    if (window.confirm(`Remove ${user.display_name} from the household?`)) {
+                    if (window.confirm(`Remove ${user.username} from the household?`)) {
                       remove.mutate(user.id);
                     }
                   }}
                 >
+                  <Trash2 aria-hidden="true" size={15} />
                   Remove
                 </button>
               )}

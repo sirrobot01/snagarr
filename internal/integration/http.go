@@ -7,6 +7,7 @@ import (
 	"errors"
 	"fmt"
 	"io"
+	"net"
 	"net/http"
 	"net/url"
 	"strings"
@@ -20,14 +21,30 @@ var UserAgent = "snagarr"
 // maxErrorBody caps how much of a failing response body an *HTTPError keeps.
 const maxErrorBody = 512
 
-var defaultHTTP = &http.Client{Timeout: 20 * time.Second}
+// A whole-library endpoint such as Radarr's /api/v3/movie serialises every
+// record before it writes the first header, which passes a minute on a large
+// collection. requestWait has to cover that. dialWait keeps the cost of a host
+// that is not there where it belongs: a service nothing answers for still fails
+// in seconds, because reaching it is a separate step from waiting on it.
+const (
+	dialWait    = 10 * time.Second
+	requestWait = 3 * time.Minute
+)
+
+var defaultHTTP = &http.Client{Timeout: requestWait, Transport: dialLimited()}
+
+func dialLimited() *http.Transport {
+	t := http.DefaultTransport.(*http.Transport).Clone()
+	t.DialContext = (&net.Dialer{Timeout: dialWait, KeepAlive: 30 * time.Second}).DialContext
+	return t
+}
 
 // client is the JSON-over-HTTP transport every integration client in this
 // package shares, so none of them reimplement request plumbing. It talks JSON
 // to a service rooted at BaseURL.
 type client struct {
 	BaseURL string
-	HTTP    *http.Client // nil uses a shared client with a 20s timeout
+	HTTP    *http.Client // nil uses a shared client with the package timeouts
 	Header  http.Header  // sent on every request
 }
 

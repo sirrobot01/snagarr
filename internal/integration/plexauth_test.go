@@ -3,6 +3,7 @@ package integration
 import (
 	"context"
 	"errors"
+	"fmt"
 	"net/http"
 	"net/http/httptest"
 	"net/url"
@@ -17,13 +18,15 @@ const (
 	plexPinClaimedFixture = `{"id":42,"code":"WXYZ1234","authToken":"plex-token","expiresAt":"2030-01-01T00:00:00Z"}`
 	plexPinDeadFixture    = `{"id":42,"code":"WXYZ1234","authToken":null,"expiresAt":"2020-01-01T00:00:00Z"}`
 
+	// Nothing listens on port 1 or 2, so those addresses fail the probe the way an
+	// address that does not route from this host does. %s is the live server.
 	plexResourcesFixture = `[
 	{"name":"Living Room TV","clientIdentifier":"player1","provides":"player",
 	 "connections":[{"uri":"https://10.0.0.9:32400","local":true,"relay":false}]},
 	{"name":"Tower","clientIdentifier":"server1","provides":"server,downloads","connections":[
-		{"uri":"https://relay.plex.direct:443","local":false,"relay":true},
-		{"uri":"https://remote.plex.direct:32400","local":false,"relay":false},
-		{"uri":"https://local.plex.direct:32400","local":true,"relay":false}
+		{"uri":"https://127.0.0.1:1","local":false,"relay":true},
+		{"uri":"%s","local":false,"relay":false},
+		{"uri":"https://127.0.0.1:2","local":true,"relay":false}
 	]}
 ]`
 )
@@ -146,8 +149,18 @@ func TestPlexAuthCheckPin(t *testing.T) {
 	}
 }
 
+// An address that answers must come first even when a local one is listed above
+// it, because plex.tv advertises addresses that never route from this host.
 func TestPlexAuthResources(t *testing.T) {
+	var live string
 	srv := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		if r.Header.Get("X-Plex-Token") != "plex-token" {
+			t.Errorf("token header = %q, want plex-token", r.Header.Get("X-Plex-Token"))
+		}
+		if r.URL.Path == "/identity" {
+			w.Write([]byte(`{"MediaContainer":{"machineIdentifier":"server1"}}`))
+			return
+		}
 		if got := r.URL.Path; got != "/api/v2/resources" {
 			t.Errorf("path = %q, want /api/v2/resources", got)
 		}
@@ -157,12 +170,10 @@ func TestPlexAuthResources(t *testing.T) {
 		if got := r.URL.Query().Get("includeRelay"); got != "1" {
 			t.Errorf("includeRelay = %q, want 1", got)
 		}
-		if got := r.Header.Get("X-Plex-Token"); got != "plex-token" {
-			t.Errorf("token header = %q, want plex-token", got)
-		}
-		w.Write([]byte(plexResourcesFixture))
+		fmt.Fprintf(w, plexResourcesFixture, live)
 	}))
 	defer srv.Close()
+	live = srv.URL
 
 	resources, err := newTestPlexAuth(srv.URL).Resources(context.Background(), "plex-token")
 	if err != nil {
@@ -175,9 +186,9 @@ func TestPlexAuthResources(t *testing.T) {
 		t.Errorf("resource = %+v, want Tower/server1", resources[0])
 	}
 	want := []Connection{
-		{URI: "https://local.plex.direct:32400", Local: true},
-		{URI: "https://remote.plex.direct:32400"},
-		{URI: "https://relay.plex.direct:443", Relay: true},
+		{URI: live, Reachable: true},
+		{URI: "https://127.0.0.1:2", Local: true},
+		{URI: "https://127.0.0.1:1", Relay: true},
 	}
 	if len(resources[0].Connections) != len(want) {
 		t.Fatalf("got %d connections, want %d: %+v", len(resources[0].Connections), len(want), resources[0].Connections)

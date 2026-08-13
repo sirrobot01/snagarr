@@ -2,9 +2,12 @@ package integration
 
 import (
 	"context"
+	"encoding/json"
+	"errors"
 	"fmt"
 	"net/http"
 	"net/url"
+	"slices"
 	"strconv"
 	"strings"
 	"time"
@@ -95,13 +98,25 @@ func (p *Plex) Items(ctx context.Context, sectionIDs []string, since time.Time) 
 			if !ok {
 				continue
 			}
-			out = append(out, m.item(t))
+			item := m.item(t)
+			item.SectionID = id
+			out = append(out, item)
 		}
 	}
 	return out, nil
 }
 
-// SyncCollection makes the named collection hold exactly itemIDs.
+// maxCollectionKeys caps how many rating keys ride on one request. The keys go
+// in the query string, so a whole library at once would overrun the request line
+// the server accepts.
+const maxCollectionKeys = 200
+
+// SyncCollection makes the named collection hold exactly members.
+//
+// A Plex collection belongs to one library section and carries that section's
+// type, so a household that snags both films and series keeps two collections of
+// the same name, one per section. Offering a show to the movie collection is
+// refused with a bare HTML 400.
 //
 // Plex's collection API is spread over several endpoints and none of them takes
 // a JSON body:
@@ -114,12 +129,42 @@ func (p *Plex) Items(ctx context.Context, sectionIDs []string, since time.Time) 
 //
 // The uri parameter is a server:// reference carrying the machine identifier and
 // a comma-separated list of rating keys.
-func (p *Plex) SyncCollection(ctx context.Context, name string, itemIDs []string) error {
+func (p *Plex) SyncCollection(ctx context.Context, name string, members []CollectionMember) error {
 	sections, err := p.Sections(ctx)
 	if err != nil {
 		return err
 	}
-	key, err := p.findCollection(ctx, sections, name)
+	machine, err := p.machineID(ctx)
+	if err != nil {
+		return err
+	}
+
+	// A section holding none of the members is still visited, because that is
+	// how the last title to leave the list leaves the collection.
+	wanted := make(map[string][]string, len(sections))
+	for _, s := range sections {
+		wanted[s.ID] = nil
+	}
+	for _, m := range members {
+		if _, ok := wanted[m.SectionID]; !ok {
+			continue // A section this server no longer reports.
+		}
+		wanted[m.SectionID] = append(wanted[m.SectionID], m.ID)
+	}
+
+	// One section that will not take its titles must not stop the others, and a
+	// failed add must not cost the removals.
+	var errs []error
+	for _, s := range sections {
+		if err := p.syncSection(ctx, name, machine, s, wanted[s.ID]); err != nil {
+			errs = append(errs, err)
+		}
+	}
+	return errors.Join(errs...)
+}
+
+func (p *Plex) syncSection(ctx context.Context, name, machine string, section Section, itemIDs []string) error {
+	key, err := p.findCollection(ctx, section.ID, name)
 	if err != nil {
 		return err
 	}
@@ -127,7 +172,17 @@ func (p *Plex) SyncCollection(ctx context.Context, name string, itemIDs []string
 		if len(itemIDs) == 0 {
 			return nil
 		}
-		return p.createCollection(ctx, name, itemIDs)
+		// Creating seeds the collection with the first keys; the diff below adds
+		// whatever did not fit.
+		if err := p.createCollection(ctx, name, machine, section, itemIDs[:min(len(itemIDs), maxCollectionKeys)]); err != nil {
+			return err
+		}
+		if key, err = p.findCollection(ctx, section.ID, name); err != nil {
+			return err
+		}
+		if key == "" {
+			return fmt.Errorf("plex create collection %s in section %s: not found afterwards", name, section.ID)
+		}
 	}
 
 	var body plexResponse
@@ -139,55 +194,49 @@ func (p *Plex) SyncCollection(ctx context.Context, name string, itemIDs []string
 		current = append(current, m.RatingKey)
 	}
 
+	var errs []error
 	add, remove := diffMembers(current, itemIDs)
-	if len(add) > 0 {
-		uri, err := p.itemURI(ctx, add)
-		if err != nil {
-			return err
-		}
-		path := "/library/collections/" + key + "/items?" + url.Values{"uri": {uri}}.Encode()
-		if err := p.rest.Put(ctx, path, nil, nil); err != nil {
-			return fmt.Errorf("plex collection add %s: %w", name, err)
+	for chunk := range slices.Chunk(add, maxCollectionKeys) {
+		q := url.Values{"uri": {itemURI(machine, chunk)}}
+		if err := p.rest.Put(ctx, "/library/collections/"+key+"/items?"+q.Encode(), nil, nil); err != nil {
+			errs = append(errs, fmt.Errorf("plex collection add %s: %w", name, err))
+			break
 		}
 	}
 	for _, id := range remove {
 		if err := p.rest.Delete(ctx, "/library/collections/"+key+"/children/"+id); err != nil {
-			return fmt.Errorf("plex collection remove %s from %s: %w", id, name, err)
+			errs = append(errs, fmt.Errorf("plex collection remove %s from %s: %w", id, name, err))
 		}
 	}
-	return nil
+	return errors.Join(errs...)
 }
 
-func (p *Plex) findCollection(ctx context.Context, sections []Section, name string) (string, error) {
-	for _, s := range sections {
-		var body plexResponse
-		if err := p.rest.Get(ctx, "/library/sections/"+s.ID+"/collections", nil, &body); err != nil {
-			return "", fmt.Errorf("plex collections in section %s: %w", s.ID, err)
-		}
-		for _, m := range body.MediaContainer.Metadata {
-			if strings.EqualFold(m.Title, name) {
-				return m.RatingKey, nil
-			}
+// findCollection looks in one section only, because that is the scope a Plex
+// collection has. The same name in another section is a different collection.
+func (p *Plex) findCollection(ctx context.Context, sectionID, name string) (string, error) {
+	var body plexResponse
+	if err := p.rest.Get(ctx, "/library/sections/"+sectionID+"/collections", nil, &body); err != nil {
+		return "", fmt.Errorf("plex collections in section %s: %w", sectionID, err)
+	}
+	for _, m := range body.MediaContainer.Metadata {
+		if strings.EqualFold(m.Title, name) {
+			return m.RatingKey, nil
 		}
 	}
 	return "", nil
 }
 
-func (p *Plex) createCollection(ctx context.Context, name string, itemIDs []string) error {
-	sectionID, kind, err := p.itemSection(ctx, itemIDs[0])
-	if err != nil {
-		return err
-	}
-	uri, err := p.itemURI(ctx, itemIDs)
-	if err != nil {
-		return err
+func (p *Plex) createCollection(ctx context.Context, name, machine string, section Section, itemIDs []string) error {
+	kind := plexMovieType
+	if section.Type == store.TV {
+		kind = plexShowType
 	}
 	q := url.Values{
 		"type":      {strconv.Itoa(kind)},
 		"title":     {name},
 		"smart":     {"0"},
-		"sectionId": {sectionID},
-		"uri":       {uri},
+		"sectionId": {section.ID},
+		"uri":       {itemURI(machine, itemIDs)},
 	}
 	if err := p.rest.Post(ctx, "/library/collections?"+q.Encode(), nil, nil); err != nil {
 		return fmt.Errorf("plex create collection %s: %w", name, err)
@@ -195,34 +244,21 @@ func (p *Plex) createCollection(ctx context.Context, name string, itemIDs []stri
 	return nil
 }
 
-// itemSection reports which library a rating key lives in, which is the only way
-// to learn the section and type a new collection needs.
-func (p *Plex) itemSection(ctx context.Context, ratingKey string) (string, int, error) {
-	var body plexResponse
-	if err := p.rest.Get(ctx, "/library/metadata/"+ratingKey, nil, &body); err != nil {
-		return "", 0, fmt.Errorf("plex metadata %s: %w", ratingKey, err)
-	}
-	if len(body.MediaContainer.Metadata) == 0 {
-		return "", 0, fmt.Errorf("plex metadata %s: no result", ratingKey)
-	}
-	m := body.MediaContainer.Metadata[0]
-	kind := plexMovieType
-	if m.Type == "show" {
-		kind = plexShowType
-	}
-	return strconv.Itoa(m.LibrarySectionID), kind, nil
-}
-
-func (p *Plex) itemURI(ctx context.Context, itemIDs []string) (string, error) {
+// machineID names this server in the uri parameter the collection endpoints
+// take.
+func (p *Plex) machineID(ctx context.Context) (string, error) {
 	var body plexResponse
 	if err := p.rest.Get(ctx, "/identity", nil, &body); err != nil {
 		return "", fmt.Errorf("plex identity: %w", err)
 	}
-	machine := body.MediaContainer.MachineIdentifier
-	if machine == "" {
+	if body.MediaContainer.MachineIdentifier == "" {
 		return "", fmt.Errorf("plex identity: no machine identifier")
 	}
-	return "server://" + machine + "/com.plexapp.plugins.library/library/metadata/" + strings.Join(itemIDs, ","), nil
+	return body.MediaContainer.MachineIdentifier, nil
+}
+
+func itemURI(machine string, itemIDs []string) string {
+	return "server://" + machine + "/com.plexapp.plugins.library/library/metadata/" + strings.Join(itemIDs, ",")
 }
 
 type plexResponse struct {
@@ -239,15 +275,39 @@ type plexResponse struct {
 }
 
 type plexMetadata struct {
-	RatingKey        string `json:"ratingKey"`
-	Type             string `json:"type"`
-	Title            string `json:"title"`
-	Year             int    `json:"year"`
-	AddedAt          int64  `json:"addedAt"`
-	LibrarySectionID int    `json:"librarySectionID"`
-	GUID             []struct {
+	RatingKey string    `json:"ratingKey"`
+	Type      string    `json:"type"`
+	Title     string    `json:"title"`
+	Year      int       `json:"year"`
+	AddedAt   int64     `json:"addedAt"`
+	GUID      plexGUIDs `json:"Guid"`
+}
+
+// plexGUIDs holds the guid values of one metadata record. Plex sends them in two
+// shapes: an array of objects under "Guid" when includeGuids is set, and always a
+// single string under "guid". Both land in this field because the JSON decoder
+// matches tags case-insensitively, so take either and keep every value.
+type plexGUIDs []string
+
+func (g *plexGUIDs) UnmarshalJSON(b []byte) error {
+	if len(b) > 0 && b[0] == '"' {
+		var s string
+		if err := json.Unmarshal(b, &s); err != nil {
+			return err
+		}
+		*g = append(*g, s)
+		return nil
+	}
+	var list []struct {
 		ID string `json:"id"`
-	} `json:"Guid"`
+	}
+	if err := json.Unmarshal(b, &list); err != nil {
+		return err
+	}
+	for _, v := range list {
+		*g = append(*g, v.ID)
+	}
+	return nil
 }
 
 func (m plexMetadata) item(t store.MediaType) LibraryItem {
@@ -256,20 +316,22 @@ func (m plexMetadata) item(t store.MediaType) LibraryItem {
 		it.AddedAt = time.Unix(m.AddedAt, 0).UTC()
 	}
 	for _, g := range m.GUID {
-		scheme, value, ok := strings.Cut(g.ID, "://")
+		scheme, value, ok := strings.Cut(g, "://")
 		if !ok {
 			continue
 		}
-		// Episode-level guids append a season/episode path; keep the id only.
+		// Episode-level guids append a season/episode path and legacy agent guids
+		// a query string; keep the id only.
+		value, _, _ = strings.Cut(value, "?")
 		if i := strings.IndexByte(value, '/'); i >= 0 {
 			value = value[:i]
 		}
 		switch scheme {
-		case "tmdb":
+		case "tmdb", "com.plexapp.agents.themoviedb":
 			it.TMDBID, _ = strconv.Atoi(value)
-		case "imdb":
+		case "imdb", "com.plexapp.agents.imdb":
 			it.IMDBID = value
-		case "tvdb":
+		case "tvdb", "com.plexapp.agents.thetvdb":
 			it.TVDBID, _ = strconv.Atoi(value)
 		}
 	}

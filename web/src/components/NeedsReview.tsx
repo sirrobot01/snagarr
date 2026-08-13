@@ -1,4 +1,5 @@
 import { useState } from 'react';
+import { AlertTriangle, ChevronDown } from 'lucide-react';
 import { NeedsReviewCard } from './NeedsReviewCard';
 import { shortDate } from '../lib/format';
 import type { Item } from '../lib/types';
@@ -17,8 +18,11 @@ export function NeedsReview({ items, onSearchManually }: Props) {
   return (
     <section className="sg-region">
       <div className="sg-review-head">
-        <h2 className="sg-review-title">NEEDS REVIEW — {items.length}</h2>
-        <span className="sg-k">NOTHING IS EVER DROPPED</span>
+        <h2 className="sg-review-title flex items-center gap-2">
+          <AlertTriangle aria-hidden="true" size={17} /> Needs your review
+          <span className="sg-review-count">{items.length}</span>
+        </h2>
+        <span className="sg-k">We kept the original capture</span>
       </div>
 
       <NeedsReviewCard key={open.id} item={open} onSearchManually={onSearchManually} />
@@ -34,8 +38,9 @@ export function NeedsReview({ items, onSearchManually }: Props) {
           >
             <span className="min-w-0 truncate">{item.raw_input}</span>
             <span className="sg-k shrink-0">
-              {[shortDate(item.captured_at), item.source].filter(Boolean).join(' · ').toUpperCase()}
+              {[shortDate(item.captured_at), item.source].filter(Boolean).join(' · ')}
             </span>
+            <ChevronDown aria-hidden="true" size={16} />
           </button>
         ))}
     </section>

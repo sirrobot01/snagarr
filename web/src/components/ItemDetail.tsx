@@ -1,3 +1,4 @@
+import { Info } from 'lucide-react';
 import { Badge } from './Badge';
 import { ItemActions } from './ItemActions';
 import { Poster } from './Poster';
@@ -37,7 +38,10 @@ export function ItemDetail({ item, admin, variant, onDone }: Props) {
         )}
 
         {sheet && <hr className="hr" />}
-        <p className={`sg-k ${sheet ? '' : 'mt-3'}`}>{captureContext(item)}</p>
+        <p className={`sg-k flex items-center gap-2 ${sheet ? '' : 'mt-3'}`}>
+          <Info aria-hidden="true" size={14} />
+          {captureContext(item)}
+        </p>
       </div>
 
       <ItemActions item={item} admin={admin} variant={variant} onDone={onDone} />

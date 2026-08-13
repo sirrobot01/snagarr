@@ -91,6 +91,23 @@ func rootFolders(ctx context.Context, rest client) ([]RootFolder, error) {
 	return out, nil
 }
 
+// arrStatus names the service and its version. It is the cheapest call that
+// proves both the URL and the API key are right: counting the library instead
+// means dumping it, which takes minutes on a large one.
+func arrStatus(ctx context.Context, rest client) (string, error) {
+	var body struct {
+		AppName string `json:"appName"`
+		Version string `json:"version"`
+	}
+	if err := rest.Get(ctx, "/api/v3/system/status", nil, &body); err != nil {
+		return "", err
+	}
+	if body.AppName == "" {
+		return "OK", nil
+	}
+	return strings.TrimSpace("OK · " + body.AppName + " " + body.Version), nil
+}
+
 // lookup returns the raw payloads Radarr and Sonarr require back when adding.
 // Posting a hand-built body with only an id is rejected by both services.
 func lookup(ctx context.Context, rest client, path, term string) ([]map[string]any, error) {

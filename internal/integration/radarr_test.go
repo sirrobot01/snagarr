@@ -98,3 +98,28 @@ func TestRadarrAddAlreadyAdded(t *testing.T) {
 		t.Fatalf("Add error = %v, want ErrAlreadyAdded", err)
 	}
 }
+
+// A ping must not touch /api/v3/movie: dumping the library to count it is what
+// made a large one time out.
+func TestRadarrPingReadsStatusOnly(t *testing.T) {
+	var paths []string
+	srv := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		paths = append(paths, r.URL.Path)
+		if r.URL.Path != "/api/v3/system/status" {
+			t.Errorf("unexpected request %s %s", r.Method, r.URL.Path)
+		}
+		w.Write([]byte(`{"appName":"Radarr","version":"5.14.0.9383"}`))
+	}))
+	defer srv.Close()
+
+	message, err := NewRadarr(srv.URL, "secret").Ping(context.Background())
+	if err != nil {
+		t.Fatalf("Ping: %v", err)
+	}
+	if want := "OK · Radarr 5.14.0.9383"; message != want {
+		t.Errorf("message = %q, want %q", message, want)
+	}
+	if len(paths) != 1 {
+		t.Errorf("paths = %v, want one status call", paths)
+	}
+}

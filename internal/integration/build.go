@@ -23,7 +23,7 @@ type LibraryProvider interface {
 	Ping(ctx context.Context) (string, error)
 	Sections(ctx context.Context) ([]Section, error)
 	Items(ctx context.Context, sectionIDs []string, since time.Time) ([]LibraryItem, error)
-	SyncCollection(ctx context.Context, name string, itemIDs []string) error
+	SyncCollection(ctx context.Context, name string, members []CollectionMember) error
 }
 
 // ErrNotConfigured reports a service whose config is missing what the client

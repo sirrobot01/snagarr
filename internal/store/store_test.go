@@ -19,9 +19,9 @@ func newTestStore(t *testing.T) *Store {
 	return s
 }
 
-func newTestUser(t *testing.T, s *Store, name string, role Role) *User {
+func newTestUser(t *testing.T, s *Store, username string, role Role) *User {
 	t.Helper()
-	u := &User{DisplayName: name, Role: role}
+	u := &User{Username: username, Role: role}
 	if err := s.CreateUser(context.Background(), u); err != nil {
 		t.Fatalf("create user: %v", err)
 	}
@@ -130,8 +130,8 @@ func TestItemLifecycle(t *testing.T) {
 	if resolved.RawInput != it.RawInput {
 		t.Errorf("raw input = %q, want it preserved", resolved.RawInput)
 	}
-	if resolved.CapturedByName != "Mukhtar" {
-		t.Errorf("captured_by name = %q, want attribution joined in", resolved.CapturedByName)
+	if resolved.CapturedByUsername != "Mukhtar" {
+		t.Errorf("captured_by username = %q, want attribution joined in", resolved.CapturedByUsername)
 	}
 
 	// Capture is idempotent per TMDB ID.
@@ -302,7 +302,7 @@ func TestStateIndexUnionsTheHousehold(t *testing.T) {
 	radarr := newTestService(t, s, b.ID, KindRadarr, "Mine")
 
 	if err := s.UpsertLibrary(ctx, plex.ID, []LibraryEntry{
-		{ProviderItemID: "1001", TMDBID: 100, MediaType: Movie, Title: "Sinners"},
+		{ProviderItemID: "1001", SectionID: "1", TMDBID: 100, MediaType: Movie, Title: "Sinners"},
 	}); err != nil {
 		t.Fatalf("upsert library: %v", err)
 	}
@@ -328,8 +328,9 @@ func TestStateIndexUnionsTheHousehold(t *testing.T) {
 	if err != nil {
 		t.Fatalf("library members: %v", err)
 	}
-	if got := members[plex.ID][TitleKey{100, Movie}]; got != "1001" {
-		t.Errorf("plex member id = %q, want 1001", got)
+	// The section rides along, because a Plex collection lives in exactly one.
+	if got := (members[plex.ID][TitleKey{100, Movie}]); got.ProviderItemID != "1001" || got.SectionID != "1" {
+		t.Errorf("plex member = %+v, want 1001 in section 1", got)
 	}
 	if len(members) != 1 {
 		t.Errorf("library members cover %d services, want only the one with titles", len(members))

@@ -33,7 +33,9 @@ export function ServiceFields({ service, draft, ready }: Props) {
           value={config.url ?? ''}
           locked={locked}
           inputMode="url"
+          type="url"
           placeholder="https://ntfy.sh"
+          description="Your ntfy server address. The hosted service is used by default."
           onChange={(value) => set({ url: value })}
         />
         <TextField
@@ -42,6 +44,7 @@ export function ServiceFields({ service, draft, ready }: Props) {
           value={config.topic ?? ''}
           locked={locked}
           placeholder="snagarr-home"
+          description="The topic that receives Snagarr notifications."
           onChange={(value) => set({ topic: value })}
         />
         <TextField
@@ -49,6 +52,7 @@ export function ServiceFields({ service, draft, ready }: Props) {
           label="Token (optional)"
           value={config.token ?? ''}
           locked={locked}
+          type="password"
           onChange={(value) => set({ token: value })}
         />
         <CheckField
@@ -70,7 +74,9 @@ export function ServiceFields({ service, draft, ready }: Props) {
         value={config.url ?? ''}
         locked={locked}
         inputMode="url"
+        type="url"
         placeholder="http://overseerr.lan:5055"
+        description="The local or public address of your Overseerr server."
         onChange={(value) => set({ url: value })}
       />
       <TextField
@@ -78,6 +84,8 @@ export function ServiceFields({ service, draft, ready }: Props) {
         label="API key"
         value={config.api_key ?? ''}
         locked={locked}
+        type="password"
+        description="Find this under Settings → General in Overseerr."
         onChange={(value) => set({ api_key: value })}
       />
     </>
