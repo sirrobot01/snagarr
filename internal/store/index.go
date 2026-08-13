@@ -172,8 +172,12 @@ func (s *Store) LoadStateIndex(ctx context.Context) (*StateIndex, error) {
 		Requests: map[TitleKey]string{},
 	}
 
+	// Every index read joins services, so a service somebody switched off stops
+	// answering for the household until they switch it back on.
 	rows, err := s.db.QueryContext(ctx,
-		`SELECT tmdb_id, media_type, provider_item_id FROM library_index WHERE tmdb_id IS NOT NULL`)
+		`SELECT l.tmdb_id, l.media_type, l.provider_item_id
+		 FROM library_index l JOIN services s ON s.id = l.service_id
+		 WHERE l.tmdb_id IS NOT NULL AND s.enabled = 1`)
 	if err != nil {
 		return nil, fmt.Errorf("load state index: %w", err)
 	}
@@ -196,7 +200,7 @@ func (s *Store) LoadStateIndex(ctx context.Context) (*StateIndex, error) {
 	rows, err = s.db.QueryContext(ctx,
 		`SELECT s.kind, a.arr_id, a.tmdb_id, a.tvdb_id, a.monitored, a.has_file, a.quality_profile_id
 		 FROM arr_index a JOIN services s ON s.id = a.service_id
-		 WHERE a.tmdb_id IS NOT NULL`)
+		 WHERE a.tmdb_id IS NOT NULL AND s.enabled = 1`)
 	if err != nil {
 		return nil, fmt.Errorf("load state index: %w", err)
 	}
@@ -228,7 +232,10 @@ func (s *Store) LoadStateIndex(ctx context.Context) (*StateIndex, error) {
 		return nil, err
 	}
 
-	rows, err = s.db.QueryContext(ctx, `SELECT tmdb_id, media_type, status FROM request_index`)
+	rows, err = s.db.QueryContext(ctx,
+		`SELECT r.tmdb_id, r.media_type, r.status
+		 FROM request_index r JOIN services s ON s.id = r.service_id
+		 WHERE s.enabled = 1`)
 	if err != nil {
 		return nil, fmt.Errorf("load state index: %w", err)
 	}
@@ -255,8 +262,9 @@ const requestAvailable = "available"
 // personal: a member's Snagged collection may only name items that server has.
 func (s *Store) LibraryMembers(ctx context.Context) (map[int64]map[TitleKey]string, error) {
 	rows, err := s.db.QueryContext(ctx,
-		`SELECT service_id, tmdb_id, media_type, provider_item_id
-		 FROM library_index WHERE tmdb_id IS NOT NULL`)
+		`SELECT l.service_id, l.tmdb_id, l.media_type, l.provider_item_id
+		 FROM library_index l JOIN services s ON s.id = l.service_id
+		 WHERE l.tmdb_id IS NOT NULL AND s.enabled = 1`)
 	if err != nil {
 		return nil, fmt.Errorf("load library members: %w", err)
 	}

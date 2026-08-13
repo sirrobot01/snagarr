@@ -123,6 +123,12 @@ func (c *HTTPCache) Set(ctx context.Context, key string, body []byte, ttl time.D
 	return err
 }
 
+// Delete removes a cached entry immediately. Single-use links rely on it.
+func (c *HTTPCache) Delete(ctx context.Context, key string) error {
+	_, err := c.store.db.ExecContext(ctx, `DELETE FROM http_cache WHERE key = ?`, key)
+	return err
+}
+
 func (s *Store) PurgeExpiredCache(ctx context.Context) error {
 	_, err := s.db.ExecContext(ctx, `DELETE FROM http_cache WHERE expires_at < ?`, time.Now().UTC())
 	return err

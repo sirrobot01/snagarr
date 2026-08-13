@@ -67,8 +67,8 @@ func (s *Server) serveShortcut(w http.ResponseWriter, r *http.Request) {
 		writeError(w, http.StatusNotFound, codeNotFound, "this link has expired or was already used")
 		return
 	}
-	if err := s.store.HTTPCache().Set(r.Context(), shortcutCachePrefix+handle, nil, -time.Second); err != nil {
-		s.log.Warn("could not expire shortcut link", "error", err)
+	if err := s.store.HTTPCache().Delete(r.Context(), shortcutCachePrefix+handle); err != nil {
+		s.log.Warn("could not consume shortcut link", "error", err)
 	}
 
 	body, err := shortcut.Build(shortcut.Options{
