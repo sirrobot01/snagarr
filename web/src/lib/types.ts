@@ -101,6 +101,9 @@ export interface StatusResponse {
     running: boolean;
   };
   services: Record<string, boolean>;
+  /** `general.shortcut_url`, repeated here because /settings is admin only and a
+      member still needs the link. Absent on a server that predates it. */
+  shortcut_url?: string;
 }
 
 export interface HouseholdUser {
@@ -142,6 +145,9 @@ export interface GeneralSettings {
   /** Go duration string. The reconcile loop re-reads it, so a change needs no restart. */
   reconcile_interval: string;
   public_url: string;
+  /** The iCloud link the operator published from the Shortcuts app. Apple signs
+      a shortcut shared that way, so it imports with no untrusted-shortcut prompt. */
+  shortcut_url: string;
   /** Returned in clear text on purpose — the operator pastes it into Radarr. */
   webhook_secret: string;
   configured: boolean;
@@ -248,16 +254,4 @@ export interface PlexServer {
   client_identifier: string;
   /** Ordered fastest-first, so the head is the one worth storing. */
   connections: PlexConnection[];
-}
-
-/* ── Apple Shortcut ───────────────────────────────────────────────────────── */
-
-export interface ShortcutLink {
-  /** Signed, short-lived, and consumed by the first download. */
-  url: string;
-  /** The `shortcuts://import-shortcut/` URL, composed by the server. */
-  import_url: string;
-  /** False when `url` resolves to an address a phone cannot reach. */
-  public: boolean;
-  expires_at: string;
 }

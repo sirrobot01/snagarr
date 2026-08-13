@@ -16,12 +16,10 @@ function detail(user: HouseholdUser): string {
 interface Props {
   users: HouseholdUser[];
   meId: number;
-  busy: boolean;
-  onShortcut: (user: HouseholdUser) => void;
   onInspect: (user: HouseholdUser) => void;
 }
 
-export function HouseholdTable({ users, meId, busy: pending, onShortcut, onInspect }: Props) {
+export function HouseholdTable({ users, meId, onInspect }: Props) {
   const client = useQueryClient();
 
   const refresh = () => void client.invalidateQueries({ queryKey: keys.users });
@@ -50,7 +48,7 @@ export function HouseholdTable({ users, meId, busy: pending, onShortcut, onInspe
     onError: (error) => pushToast(`REMOVE FAILED — ${errorText(error).toUpperCase()}`),
   });
 
-  const busy = revoke.isPending || remove.isPending || pending;
+  const busy = revoke.isPending || remove.isPending;
 
   return (
     <table className="table">
@@ -73,14 +71,6 @@ export function HouseholdTable({ users, meId, busy: pending, onShortcut, onInspe
             </td>
             <td className="text-muted">{detail(user)}</td>
             <td className="text-right whitespace-nowrap">
-              <button
-                type="button"
-                className="btn btn-ghost min-h-[44px]"
-                disabled={busy}
-                onClick={() => onShortcut(user)}
-              >
-                Shortcut
-              </button>
               <button
                 type="button"
                 className="btn btn-ghost min-h-[44px]"

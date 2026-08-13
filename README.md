@@ -66,7 +66,7 @@ Every service card has a **Test connection** button.
 | Client | How |
 |---|---|
 | Web | The add box is the home page, focused on load. `/` refocuses it. |
-| Apple Shortcut | Settings generates a per-user import link. Send it; no manual build. |
+| Apple Shortcut | Build one, share it as an iCloud link, store the link in `general.shortcut_url`. |
 | Bookmarklet | Generated in Settings. Sends the current page. |
 | Anything | `POST /api/v1/capture` with a bearer token. |
 

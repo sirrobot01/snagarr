@@ -36,6 +36,19 @@ export function GeneralCard({ settings, draft }: CardProps) {
         onChange={(value) => draft.set('general', { reconcile_interval: value })}
       />
 
+      <TextField
+        id="general-shortcut-url"
+        label="iOS Shortcut link"
+        value={current.shortcut_url}
+        locked={current.locked}
+        inputMode="url"
+        placeholder="https://www.icloud.com/shortcuts/…"
+        onChange={(value) => draft.set('general', { shortcut_url: value })}
+      />
+      <p className="text-muted m-0 text-[11px] leading-[1.5]">
+        The link you publish from the Shortcuts app with <strong>Share → Copy iCloud Link</strong>.
+      </p>
+
       <CopyField id="general-webhook" label="Webhook secret" value={current.webhook_secret} />
       <p className="text-muted m-0 break-all text-[11px] leading-[1.5]">
         Webhook URL: <code>{`${base}/api/v1/webhooks/radarr?secret=${current.webhook_secret}`}</code>

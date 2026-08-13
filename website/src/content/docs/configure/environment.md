@@ -47,6 +47,7 @@ The container image sets `SNAGARR_DATA_DIR=/data`.
 | `SNAGARR_NTFY_TOKEN` | `ntfy.token` | string |
 | `SNAGARR_TELEGRAM_BOT_TOKEN` | `telegram.bot_token` | string |
 | `SNAGARR_PUBLIC_URL` | `general.public_url` | string |
+| `SNAGARR_SHORTCUT_URL` | `general.shortcut_url` | string |
 | `SNAGARR_RECONCILE_INTERVAL` | `general.reconcile_interval` | Go duration |
 
 ## Rules

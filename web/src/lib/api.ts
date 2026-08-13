@@ -17,7 +17,6 @@ import type {
   ServicePatch,
   Settings,
   SettingsPatch,
-  ShortcutLink,
   StatusResponse,
   TestResult,
   Token,
@@ -170,12 +169,6 @@ export const api = {
 
   plexServers: (token: string) =>
     request<{ servers: PlexServer[] }>(`/plex/servers${query({ token })}`),
-
-  /* ── Apple Shortcut ─────────────────────────────────────────────────────── */
-
-  /** Admin only. Returns a short-lived signed download link. */
-  shortcut: (userId: number) =>
-    request<ShortcutLink>(`/users/${userId}/shortcut`, { method: 'POST' }),
 
   sync: () => request<void>('/admin/sync', { method: 'POST' }),
 };

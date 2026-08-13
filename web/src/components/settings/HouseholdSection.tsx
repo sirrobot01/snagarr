@@ -1,26 +1,19 @@
 import { useMutation } from '@tanstack/react-query';
 import { useState } from 'react';
-import { ApiError, api } from '../../lib/api';
+import { api } from '../../lib/api';
 import { useStatus, useUsers } from '../../lib/queries';
 import { pushToast } from '../../lib/toast';
-import type { HouseholdUser, ShortcutLink } from '../../lib/types';
+import type { HouseholdUser } from '../../lib/types';
 import { AddMemberForm } from './AddMemberForm';
 import { BookmarkletPanel, useBookmarklet } from './Bookmarklet';
 import { HouseholdTable } from './HouseholdTable';
 import { MemberServices } from './MemberServices';
-import { ShortcutPanel } from './ShortcutPanel';
 import { ErrorState, Loading, errorText } from './states';
-
-interface Issued {
-  user: HouseholdUser;
-  link: ShortcutLink;
-}
 
 export function HouseholdSection({ publicUrl, meId }: { publicUrl: string; meId: number }) {
   const users = useUsers(true);
   const status = useStatus();
   const [adding, setAdding] = useState(false);
-  const [issued, setIssued] = useState<Issued | null>(null);
   const [inspecting, setInspecting] = useState<HouseholdUser | null>(null);
   const bookmarklet = useBookmarklet(publicUrl, meId);
 
@@ -28,18 +21,6 @@ export function HouseholdSection({ publicUrl, meId }: { publicUrl: string; meId:
     mutationFn: api.sync,
     onSuccess: () => pushToast('RECONCILE STARTED'),
     onError: (error) => pushToast(`RECONCILE FAILED — ${errorText(error).toUpperCase()}`),
-  });
-
-  const shortcut = useMutation({
-    mutationFn: (user: HouseholdUser) =>
-      api.shortcut(user.id).then((link) => ({ user, link })),
-    onSuccess: setIssued,
-    onError: (error) =>
-      pushToast(
-        error instanceof ApiError && error.status === 404
-          ? 'SHORTCUT LINKS ARE NOT AVAILABLE ON THIS SERVER YET'
-          : `SHORTCUT FAILED — ${errorText(error).toUpperCase()}`,
-      ),
   });
 
   const running = status.data?.sync.running === true || sync.isPending;
@@ -51,13 +32,7 @@ export function HouseholdSection({ publicUrl, meId }: { publicUrl: string; meId:
       {users.isError ? (
         <ErrorState error={users.error} onRetry={() => void users.refetch()} />
       ) : users.data ? (
-        <HouseholdTable
-          users={users.data.users}
-          meId={meId}
-          busy={shortcut.isPending}
-          onShortcut={(user) => shortcut.mutate(user)}
-          onInspect={setInspecting}
-        />
+        <HouseholdTable users={users.data.users} meId={meId} onInspect={setInspecting} />
       ) : (
         <Loading label="LOADING HOUSEHOLD…" />
       )}
@@ -91,9 +66,6 @@ export function HouseholdSection({ publicUrl, meId }: { publicUrl: string; meId:
       {adding && <AddMemberForm onDone={() => setAdding(false)} />}
       {inspecting && (
         <MemberServices user={inspecting} onClose={() => setInspecting(null)} />
-      )}
-      {issued && (
-        <ShortcutPanel name={issued.user.display_name} link={issued.link} publicUrl={publicUrl} />
       )}
       {bookmarklet.code !== null && <BookmarkletPanel code={bookmarklet.code} />}
     </section>

@@ -52,11 +52,14 @@ Use a TMDB API key (v3).
 |-------|------|---------|----------|
 | `general.reconcile_interval` | duration | `15m0s` | `SNAGARR_RECONCILE_INTERVAL` |
 | `general.public_url` | string | *(empty)* | `SNAGARR_PUBLIC_URL` |
+| `general.shortcut_url` | string | *(empty)* | `SNAGARR_SHORTCUT_URL` |
 | `general.webhook_secret` | string | *(32 hex characters, generated)* | *(none)* |
 
 `reconcile_interval` is a Go duration string (`15m`, `1h`, `90s`). Zero or less falls back to 15 minutes. The value round-trips in long form: send `15m`, read `15m0s`. The loop reads the interval before each wait, so a change applies after the current wait ends without a restart.
 
 `public_url` is the URL an outside client uses, for example `https://snagarr.example.com`. It builds the ntfy click link, the setup URL and the bookmarklet.
+
+`shortcut_url` is the iCloud link you publish from the Shortcuts app, for example `https://www.icloud.com/shortcuts/abc123`. The Snag screen shows an **Install the iOS Shortcut** button while it is set, and hides the button while it is empty. Build the shortcut first. See [Capture clients](/snagarr/use/clients/#apple-shortcut).
 
 `webhook_secret` authenticates every inbound webhook. It has no environment override. See [Webhooks](/snagarr/use/webhooks/).
 
@@ -80,9 +83,8 @@ An override locks the whole settings card, not one field: the UI renders the car
 | `sonarr.season_folder` | API |
 | `ntfy.token` | API, or `SNAGARR_NTFY_TOKEN` |
 | `ntfy.priority` | API |
-| every `general.*` field | API, or the variables above |
 
-The UI has no General card. Read `general.webhook_secret` with `GET /api/v1/settings` and an admin token.
+The General card renders `public_url`, `reconcile_interval`, `shortcut_url` and `webhook_secret`.
 
 ```sh
 curl -X PUT http://localhost:8080/api/v1/settings \

@@ -45,6 +45,11 @@ type GeneralSettings struct {
 	ReconcileInterval Duration `json:"reconcile_interval"`
 	PublicURL         string   `json:"public_url"`
 
+	// ShortcutURL is the operator's published iCloud Shortcut link. Apple signs
+	// shortcuts shared that way, so it imports without the untrusted-shortcut
+	// prompt an unsigned file would trigger.
+	ShortcutURL string `json:"shortcut_url"`
+
 	// WebhookSecret authenticates the inbound webhook routes. It is readable
 	// on purpose: the operator has to paste it into Radarr and Tautulli.
 	WebhookSecret string `json:"webhook_secret"`
@@ -202,10 +207,12 @@ func overlayEnv(s *Settings) map[string]bool {
 	strs := map[string]*string{
 		"SNAGARR_TMDB_API_KEY": &s.TMDB.APIKey,
 		"SNAGARR_PUBLIC_URL":   &s.General.PublicURL,
+		"SNAGARR_SHORTCUT_URL": &s.General.ShortcutURL,
 	}
 	paths := map[string]string{
 		"SNAGARR_TMDB_API_KEY": "tmdb.api_key",
 		"SNAGARR_PUBLIC_URL":   "general.public_url",
+		"SNAGARR_SHORTCUT_URL": "general.shortcut_url",
 	}
 	for name, field := range strs {
 		if v := os.Getenv(name); v != "" {

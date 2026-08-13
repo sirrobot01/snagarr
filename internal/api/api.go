@@ -1,6 +1,5 @@
 // Package api exposes the HTTP surface. The API is the product: the web client
-// is one consumer of it, alongside the Shortcut, the bookmarklet and the bot.
-// It also generates the Apple Shortcut it hands out.
+// is one consumer of it, alongside the Shortcut and the bookmarklet.
 package api
 
 import (
@@ -41,9 +40,6 @@ func (s *Server) Handler() http.Handler {
 		// Webhook senders authenticate with a shared secret in the query
 		// string, because Radarr, Tautulli and Emby cannot all set headers.
 		r.Post("/webhooks/{service}", s.webhook)
-		// The generated link is the credential and is consumed on first use,
-		// so this route carries no bearer token — an iPhone cannot send one.
-		r.Get("/shortcut/{handle}", s.serveShortcut)
 
 		r.Group(func(r chi.Router) {
 			r.Use(s.authenticate)
@@ -83,7 +79,6 @@ func (s *Server) Handler() http.Handler {
 				r.Get("/users/{id}/tokens", s.listTokens)
 				r.Post("/users/{id}/tokens", s.createToken)
 				r.Get("/users/{id}/services", s.listUserServices)
-				r.Post("/users/{id}/shortcut", s.createShortcutLink)
 				r.Delete("/tokens/{id}", s.revokeToken)
 				r.Get("/settings", s.getSettings)
 				r.Put("/settings", s.putSettings)
@@ -121,6 +116,8 @@ func (s *Server) status(w http.ResponseWriter, r *http.Request) {
 		"version": buildVersion,
 		"counts":  counts,
 		"sync":    s.reconciler.Status(),
+		// The Snag empty state links to this, and /settings is admin-only.
+		"shortcut_url": s.settings.Get().General.ShortcutURL,
 		// Household-wide: one member's Radarr answers for everybody, because
 		// the list they all read is a shared one.
 		"services": map[string]bool{

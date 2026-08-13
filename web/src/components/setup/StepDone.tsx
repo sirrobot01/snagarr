@@ -65,7 +65,7 @@ export function StepDone() {
       )}
 
       <ol className="m-0 flex list-decimal flex-col gap-1 pl-4 text-[13px] text-muted">
-        <li>Send each member their Apple Shortcut from Settings.</li>
+        <li>Paste your published iCloud Shortcut link under Settings → General.</li>
         <li>Invite the rest of the household under Settings.</li>
         <li>Snag something — the first library index runs in the background.</li>
       </ol>

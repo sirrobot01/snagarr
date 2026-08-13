@@ -268,6 +268,7 @@ Revokes one token. `204 No Content`.
                "token": "", "priority": 3, "configured": true },
   "telegram":{ "bot_token": "••••", "configured": false },
   "general": { "reconcile_interval": "15m0s", "public_url": "http://localhost:8080",
+               "shortcut_url": "https://www.icloud.com/shortcuts/abc123",
                "webhook_secret": "3f8c1e…" }
 }
 ```
