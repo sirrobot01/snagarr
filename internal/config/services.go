@@ -88,9 +88,29 @@ func DefaultServiceConfig(kind store.ServiceKind) []byte {
 	return raw
 }
 
-// seededName is the name every environment-configured service gets, matching
-// the name the API gives a service created without one.
-const seededName = "Default"
+// legacySeededName is what environment-configured services were called before
+// the name carried the kind. An existing one is adopted and renamed rather than
+// left beside a second copy.
+const legacySeededName = "Default"
+
+var kindLabels = map[store.ServiceKind]string{
+	store.KindPlex:      "Plex",
+	store.KindEmby:      "Emby",
+	store.KindJellyfin:  "Jellyfin",
+	store.KindRadarr:    "Radarr",
+	store.KindSonarr:    "Sonarr",
+	store.KindOverseerr: "Overseerr",
+	store.KindNtfy:      "ntfy",
+}
+
+// SeededName matches the name the UI gives a service created without one.
+func SeededName(kind store.ServiceKind) string {
+	label, ok := kindLabels[kind]
+	if !ok {
+		label = string(kind)
+	}
+	return label + " - Default"
+}
 
 // SeedServices gives the first admin the services the environment describes, so
 // a Docker-first operator never has to open the UI. Environment values win over
@@ -120,7 +140,11 @@ func (m *Manager) SeedServices(ctx context.Context, s *store.Store) error {
 	}
 	locked := map[int64]bool{}
 	for _, kind := range envKinds() {
-		current := findService(owned, kind, seededName)
+		name := SeededName(kind)
+		current := findService(owned, kind, name)
+		if current == nil {
+			current = findService(owned, kind, legacySeededName)
+		}
 		base := DefaultServiceConfig(kind)
 		if current != nil {
 			base = current.Config
@@ -135,7 +159,7 @@ func (m *Manager) SeedServices(ctx context.Context, s *store.Store) error {
 
 		if current == nil {
 			svc := &store.Service{
-				UserID: users[admin].ID, Kind: kind, Name: seededName,
+				UserID: users[admin].ID, Kind: kind, Name: name,
 				Config: config, Enabled: true,
 			}
 			if err := s.CreateService(ctx, svc); err != nil {
@@ -144,6 +168,7 @@ func (m *Manager) SeedServices(ctx context.Context, s *store.Store) error {
 			locked[svc.ID] = true
 			continue
 		}
+		current.Name = name
 		current.Config = config
 		if err := s.UpdateService(ctx, current); err != nil {
 			return err

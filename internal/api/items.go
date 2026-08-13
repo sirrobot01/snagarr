@@ -123,6 +123,9 @@ func (s *Server) captureKnownTitle(w http.ResponseWriter, r *http.Request, req c
 	if err := s.reconciler.RefreshItem(ctx, it.ID); err != nil {
 		s.log.Warn("could not compute state for new item", "item", it.ID, "error", err)
 	}
+	// Inline, so the item this returns already carries the state the send left
+	// it in. The state is what the client draws its badge from.
+	s.autoSend(ctx, it.ID)
 
 	saved, err := s.store.Item(ctx, it.ID)
 	if err != nil {
@@ -143,6 +146,7 @@ func (s *Server) resolveInBackground(ctx context.Context, client *integration.TM
 	if err := s.reconciler.RefreshItem(ctx, itemID); err != nil {
 		s.log.Warn("could not compute state after resolve", "item", itemID, "error", err)
 	}
+	s.autoSend(ctx, itemID)
 }
 
 func (s *Server) listItems(w http.ResponseWriter, r *http.Request) {
@@ -233,6 +237,7 @@ func (s *Server) resolveItem(w http.ResponseWriter, r *http.Request) {
 	if err := s.reconciler.RefreshItem(r.Context(), it.ID); err != nil {
 		s.log.Warn("could not compute state after resolve", "item", it.ID, "error", err)
 	}
+	s.autoSend(r.Context(), it.ID)
 
 	s.respondWithItem(w, r, it.ID)
 }
@@ -262,28 +267,59 @@ func (s *Server) sendItem(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 	owners := s.serviceOwners(ctx, userFrom(r), it.CapturedBy)
-	var status store.Status
 
-	switch req.Target {
+	status, err := s.send(ctx, house, *it, req.Target, owners)
+	if errors.Is(err, errNoTarget) {
+		writeError(w, http.StatusServiceUnavailable, codeNotConfigured, "nobody has a %s configured", req.Target)
+		return
+	}
+	if errors.Is(err, errUnknownTarget) {
+		writeError(w, http.StatusBadRequest, codeBadRequest, "target must be radarr, sonarr or overseerr")
+		return
+	}
+	if err != nil {
+		writeError(w, http.StatusBadGateway, codeUpstreamError, "%s rejected the request: %v", req.Target, err)
+		return
+	}
+	if err := s.store.SetStatus(ctx, it.ID, status, time.Time{}); err != nil {
+		s.writeStoreError(w, err, "item")
+		return
+	}
+	s.reconciler.Trigger()
+
+	s.respondWithItem(w, r, it.ID)
+}
+
+var (
+	errNoTarget      = errors.New("nobody has that service configured")
+	errUnknownTarget = errors.New("unknown send target")
+)
+
+// send hands one title to one service and reports the state that leaves the
+// item in. It is shared by the Send button and by automatic sending, which have
+// to reach the same service with the same options.
+func (s *Server) send(ctx context.Context, house integration.Household, it store.Item,
+	target string, owners []int64) (store.Status, error) {
+	var err error
+	status := store.StatusMonitored
+
+	switch target {
 	case "radarr":
-		target := house.RadarrFor(owners...)
-		if target == nil {
-			writeError(w, http.StatusServiceUnavailable, codeNotConfigured, "nobody has a Radarr configured")
-			return
+		radarr := house.RadarrFor(owners...)
+		if radarr == nil {
+			return "", errNoTarget
 		}
-		_, err = target.Client.Add(ctx, int(it.TMDBID), integration.AddOptions{
-			QualityProfileID: target.Config.QualityProfileID,
-			RootFolder:       target.Config.RootFolder,
+		_, err = radarr.Client.Add(ctx, int(it.TMDBID), integration.AddOptions{
+			QualityProfileID: radarr.Config.QualityProfileID,
+			RootFolder:       radarr.Config.RootFolder,
 			Monitor:          true,
-			SearchOnAdd:      target.Config.SearchOnAdd,
+			SearchOnAdd:      radarr.Config.SearchOnAdd,
 		})
-		status = store.StatusMonitored
 
 	case "sonarr":
-		target := house.SonarrFor(owners...)
-		if target == nil {
-			writeError(w, http.StatusServiceUnavailable, codeNotConfigured, "nobody has a Sonarr configured")
-			return
+		sonarr := house.SonarrFor(owners...)
+		if sonarr == nil {
+			return "", errNoTarget
 		}
 		ids := integration.ArrExternalIDs{TMDBID: int(it.TMDBID), Title: it.Title, Year: it.Year}
 		// Sonarr keys on TVDB, so the TMDB ID has to be translated first.
@@ -292,41 +328,74 @@ func (s *Server) sendItem(w http.ResponseWriter, r *http.Request) {
 				ids.TVDBID, ids.IMDBID = external.TVDBID, external.IMDBID
 			}
 		}
-		_, err = target.Client.Add(ctx, ids, integration.AddOptions{
-			QualityProfileID: target.Config.QualityProfileID,
-			RootFolder:       target.Config.RootFolder,
+		_, err = sonarr.Client.Add(ctx, ids, integration.AddOptions{
+			QualityProfileID: sonarr.Config.QualityProfileID,
+			RootFolder:       sonarr.Config.RootFolder,
 			Monitor:          true,
-			SearchOnAdd:      target.Config.SearchOnAdd,
-			SeasonFolder:     target.Config.SeasonFolder,
+			SearchOnAdd:      sonarr.Config.SearchOnAdd,
+			SeasonFolder:     sonarr.Config.SeasonFolder,
 		})
-		status = store.StatusMonitored
 
 	case "overseerr":
-		target := house.OverseerrFor(owners...)
-		if target == nil {
-			writeError(w, http.StatusServiceUnavailable, codeNotConfigured, "nobody has an Overseerr configured")
-			return
+		overseerr := house.OverseerrFor(owners...)
+		if overseerr == nil {
+			return "", errNoTarget
 		}
-		_, err = target.Client.Create(ctx, int(it.TMDBID), it.MediaType)
+		_, err = overseerr.Client.Create(ctx, int(it.TMDBID), it.MediaType)
 		status = store.StatusRequested
 
 	default:
-		writeError(w, http.StatusBadRequest, codeBadRequest, "target must be radarr, sonarr or overseerr")
-		return
+		return "", errUnknownTarget
 	}
 
 	// A title the service already tracks is the outcome the user wanted.
 	if err != nil && !errors.Is(err, integration.ErrAlreadyAdded) {
-		writeError(w, http.StatusBadGateway, codeUpstreamError, "%s rejected the request: %v", req.Target, err)
-		return
+		return "", err
 	}
-	if err := s.store.SetStatus(r.Context(), it.ID, status, time.Time{}); err != nil {
-		s.writeStoreError(w, err, "item")
-		return
-	}
-	s.reconciler.Trigger()
+	return status, nil
+}
 
-	s.respondWithItem(w, r, it.ID)
+// autoSend is "add to Radarr or Sonarr by default": a title that resolves to
+// something nobody owns yet goes straight to the capturer's own download
+// manager. It spends nobody else's service, and it never fails a capture — an
+// unreachable Radarr leaves the item exactly where the Send button can retry.
+func (s *Server) autoSend(ctx context.Context, itemID int64) {
+	if !s.settings.Get().General.AutoSend {
+		return
+	}
+	it, err := s.store.Item(ctx, itemID)
+	if err != nil || it.TMDBID == 0 {
+		return
+	}
+	// Anything already in the library, monitored or requested needs nothing.
+	if it.Status != store.StatusNew || it.Archived() {
+		return
+	}
+
+	target := "radarr"
+	if it.MediaType == store.TV {
+		target = "sonarr"
+	}
+	house, err := s.household(ctx)
+	if err != nil {
+		s.log.Warn("automatic send could not read services", "item", itemID, "error", err)
+		return
+	}
+
+	status, err := s.send(ctx, house, *it, target, []int64{it.CapturedBy})
+	if errors.Is(err, errNoTarget) {
+		return
+	}
+	if err != nil {
+		s.log.Warn("automatic send failed", "item", itemID, "target", target, "error", err)
+		return
+	}
+	if err := s.store.SetStatus(ctx, it.ID, status, time.Time{}); err != nil {
+		s.log.Warn("automatic send could not record the state", "item", itemID, "error", err)
+		return
+	}
+	s.log.Info("sent automatically", "item", itemID, "title", it.Title, "target", target)
+	s.reconciler.Trigger()
 }
 
 func (s *Server) archiveItem(w http.ResponseWriter, r *http.Request) {

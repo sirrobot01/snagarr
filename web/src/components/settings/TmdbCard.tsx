@@ -2,7 +2,7 @@ import { Database, PlugZap } from 'lucide-react';
 import { useSaveSettings } from '../../lib/queries';
 import type { CardProps } from './draft';
 import { TextField } from './fields';
-import { CardHead } from './ServiceCard';
+import { CardHead } from './CardHead';
 import { cardStatus, useTmdbTest } from './service';
 
 /* The one global service left. It has no service record, so it is still tested

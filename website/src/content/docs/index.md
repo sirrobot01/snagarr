@@ -18,7 +18,7 @@ Snagarr is one Go binary with the React client embedded. All state lives in one 
 
 1. **Capture.** A client posts free text, a link or a TMDB ID to `POST /api/v1/capture`.
 2. **Identify.** The resolver matches the input against TMDB. An input with no clear winner stays `needs_review` with scored candidates attached.
-3. **Send.** A member sends the item to their own Radarr, Sonarr or Overseerr, with that service's quality profile and root folder.
+3. **Send.** A resolved title goes to the capturer's own Radarr or Sonarr at once, because `general.auto_send` is on by default. Turn it off to send by hand. A member can always send to their own Radarr, Sonarr or Overseerr, with that service's quality profile and root folder.
 4. **Reconcile.** Every 15 minutes Snagarr mirrors every member's media server, Radarr, Sonarr and Overseerr into local indexes, then recomputes each item status.
 5. **Notify.** An item that becomes available triggers one ntfy push to the capturer, and enters the `Snagged` collection on every media server that holds it.
 6. **Retire.** A playback webhook marks the item watched and removes the title from the collections.

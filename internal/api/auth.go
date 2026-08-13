@@ -3,7 +3,6 @@ package api
 import (
 	"context"
 	"crypto/sha256"
-	"crypto/subtle"
 	"errors"
 	"net/http"
 	"regexp"
@@ -152,12 +151,31 @@ func userFrom(r *http.Request) *store.User {
 	return user
 }
 
-// verifyWebhookSecret guards the webhook routes. Radarr, Tautulli and Emby
-// cannot all set headers, so the shared secret travels in the query string.
-func (s *Server) verifyWebhookSecret(r *http.Request) bool {
-	want := s.settings.Get().General.WebhookSecret
-	got := r.URL.Query().Get("secret")
-	return want != "" && subtle.ConstantTimeCompare([]byte(want), []byte(got)) == 1
+// webhookAuthorized guards the webhook routes with the two credentials a sender
+// can actually offer. Radarr and Sonarr carry a username and a password on a
+// webhook connection; Tautulli, Emby and Jellyfin set the header themselves.
+// Either way the credential is one a household member already holds, so there
+// is no separate secret to keep in step.
+func (s *Server) webhookAuthorized(r *http.Request) bool {
+	if token, ok := strings.CutPrefix(r.Header.Get("Authorization"), "Bearer "); ok {
+		return s.tokenAuthenticates(r, token)
+	}
+	if username, password, ok := r.BasicAuth(); ok {
+		u, err := s.store.UserByUsername(r.Context(), strings.TrimSpace(username))
+		return err == nil && u.PasswordHash != "" && passwordMatches(u.PasswordHash, password)
+	}
+	// Emby sets no header of its own, so a token may travel in the query
+	// string. It is still a real token: owned by a member, and revocable.
+	return s.tokenAuthenticates(r, r.URL.Query().Get("token"))
+}
+
+func (s *Server) tokenAuthenticates(r *http.Request, token string) bool {
+	token = strings.TrimSpace(token)
+	if token == "" {
+		return false
+	}
+	_, err := s.store.Authenticate(r.Context(), token)
+	return err == nil
 }
 
 // allowCrossOrigin lets the bookmarklet and other page-embedded clients reach

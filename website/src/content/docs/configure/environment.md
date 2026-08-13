@@ -13,6 +13,20 @@ Snagarr reads three kinds of variable.
 
 No `SNAGARR_*` variable outside these tables exists.
 
+The container image reads four more that carry no prefix, because the
+entrypoint reads them rather than Snagarr itself. See
+[Install](/snagarr/start/install/#user-and-group).
+
+| Variable | Default | Effect |
+|----------|---------|--------|
+| `PUID` | `1000` | User ID the process runs as |
+| `PGID` | `1000` | Group ID the process runs as |
+| `UMASK` | `022` | Mode mask for files Snagarr creates |
+| `TZ` | UTC | Time zone for log timestamps |
+
+The binary ignores all four. Outside Docker the process runs as whoever started
+it, and `systemd` sets the identity with `User=` and `Group=`.
+
 ## Start-up options
 
 | Variable | Default | Effect | Flag |
@@ -35,12 +49,9 @@ The container image sets `SNAGARR_DATA_DIR=/data`.
 |----------|-----------|------|
 | `SNAGARR_TMDB_API_KEY` | `tmdb.api_key` | string |
 | `SNAGARR_PUBLIC_URL` | `general.public_url` | string |
-| `SNAGARR_SHORTCUT_URL` | `general.shortcut_url` | string |
 | `SNAGARR_RECONCILE_INTERVAL` | `general.reconcile_interval` | Go duration |
 
-These four are the whole list. Settings hold nothing else now: every other integration is a [service](/snagarr/configure/services/).
-
-`general.webhook_secret` has no variable.
+These three are the whole list. Settings hold nothing else now: every other integration is a [service](/snagarr/configure/services/).
 
 ## Service seeding
 
@@ -68,7 +79,7 @@ The variables below do not override a setting. They write **the first admin's** 
 
 ### Rules
 
-- Each seeded service is owned by the first admin and named `Default`.
+- Each seeded service is owned by the first admin and named after its kind, for example `Radarr - Default`.
 - Seeding runs on every start. It rewrites the config of the service it owns.
 - A seeded service comes back with `"locked": true`. The UI renders its fields read-only.
 - Snagarr skips a kind the environment says nothing about. A service you made in the UI is left alone.
@@ -106,4 +117,4 @@ volumes:
   snagarr:
 ```
 
-That file gives the first admin a Plex service called `Default`. Every other member connects their own.
+That file gives the first admin a Plex service called `Plex - Default`. Every other member connects their own.

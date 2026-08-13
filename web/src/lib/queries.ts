@@ -7,6 +7,7 @@ import {
 import { ApiError, api } from './api';
 import { pushToast } from './toast';
 import type {
+  CreatedToken,
   Item,
   ItemsResponse,
   NewService,
@@ -30,7 +31,9 @@ export const keys = {
   tokens: (userId: number) => ['tokens', userId] as const,
   services: ['services'] as const,
   userServices: (userId: number) => ['services', 'user', userId] as const,
-  options: (id: number) => ['options', id] as const,
+  /* The credentials are part of the key: change them and the lists that came
+     back for the old ones are no longer the answer. */
+  options: (id: number, credentials: string) => ['options', id, credentials] as const,
 };
 
 const TEMP_ID = -1;
@@ -302,6 +305,38 @@ export function useUsers(enabled: boolean) {
 
 export function isAdmin(me: UserRef | undefined) {
   return me?.role === 'admin';
+}
+
+/* ── Tokens ───────────────────────────────────────────────────────────────── */
+
+export function useTokens(userId: number) {
+  return useQuery({ queryKey: keys.tokens(userId), queryFn: () => api.tokens(userId) });
+}
+
+/* Issuing or revoking a token changes the count the household table prints, so
+   both refresh the user list with the token list. */
+function useTokenMutation<V, R>(action: string, userId: number, run: (value: V) => Promise<R>) {
+  const client = useQueryClient();
+  return useMutation({
+    mutationFn: run,
+    onError: (error) => failed(action, error),
+    onSettled: () => {
+      void client.invalidateQueries({ queryKey: keys.tokens(userId) });
+      void client.invalidateQueries({ queryKey: keys.users });
+    },
+  });
+}
+
+/** The response holds the only readable copy of the secret, so the caller keeps
+    it rather than the cache. */
+export function useCreateToken(userId: number) {
+  return useTokenMutation<string, CreatedToken>('create token', userId, (name) =>
+    api.createToken(userId, name),
+  );
+}
+
+export function useRevokeToken(userId: number) {
+  return useTokenMutation<number, void>('revoke token', userId, api.revokeToken);
 }
 
 /* ── Services ─────────────────────────────────────────────────────────────── */

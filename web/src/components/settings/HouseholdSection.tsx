@@ -5,18 +5,20 @@ import { api } from '../../lib/api';
 import { useStatus, useUsers } from '../../lib/queries';
 import { pushToast } from '../../lib/toast';
 import type { HouseholdUser } from '../../lib/types';
-import { AddMemberForm } from './AddMemberForm';
-import { BookmarkletPanel, useBookmarklet } from './Bookmarklet';
+import { BookmarkletDialog } from './BookmarkletDialog';
 import { HouseholdTable } from './HouseholdTable';
-import { MemberServices } from './MemberServices';
+import { MemberDialog } from './MemberDialog';
+import { MemberServicesDialog } from './MemberServicesDialog';
+import { TokensDialog } from './TokensDialog';
 import { ErrorState, Loading, errorText } from './states';
 
 export function HouseholdSection({ publicUrl, meId }: { publicUrl: string; meId: number }) {
   const users = useUsers(true);
   const status = useStatus();
   const [adding, setAdding] = useState(false);
+  const [bookmarklet, setBookmarklet] = useState(false);
   const [inspecting, setInspecting] = useState<HouseholdUser | null>(null);
-  const bookmarklet = useBookmarklet(publicUrl, meId);
+  const [tokensFor, setTokensFor] = useState<HouseholdUser | null>(null);
 
   const sync = useMutation({
     mutationFn: api.sync,
@@ -33,7 +35,7 @@ export function HouseholdSection({ publicUrl, meId }: { publicUrl: string; meId:
         <div>
           <h3 className="m-0 text-[22px]">Household access</h3>
           <p className="text-muted m-0 text-[13px]">
-            Manage who can sign in, their connected services, and capture tokens.
+            Manage who can sign in, their connected services, and their capture tokens.
           </p>
         </div>
       </div>
@@ -41,7 +43,12 @@ export function HouseholdSection({ publicUrl, meId }: { publicUrl: string; meId:
       {users.isError ? (
         <ErrorState error={users.error} onRetry={() => void users.refetch()} />
       ) : users.data ? (
-        <HouseholdTable users={users.data.users} meId={meId} onInspect={setInspecting} />
+        <HouseholdTable
+          users={users.data.users}
+          meId={meId}
+          onInspect={setInspecting}
+          onTokens={setTokensFor}
+        />
       ) : (
         <Loading label="Loading household…" />
       )}
@@ -58,11 +65,10 @@ export function HouseholdSection({ publicUrl, meId }: { publicUrl: string; meId:
         <button
           type="button"
           className="btn btn-secondary min-h-[44px]"
-          disabled={bookmarklet.pending}
-          onClick={bookmarklet.generate}
+          onClick={() => setBookmarklet(true)}
         >
           <Bookmark aria-hidden="true" size={16} />
-          {bookmarklet.pending ? 'Generating…' : 'Generate bookmarklet'}
+          Browser bookmarklet
         </button>
         <button
           type="button"
@@ -75,11 +81,18 @@ export function HouseholdSection({ publicUrl, meId }: { publicUrl: string; meId:
         </button>
       </div>
 
-      {adding && <AddMemberForm onDone={() => setAdding(false)} />}
-      {inspecting && (
-        <MemberServices user={inspecting} onClose={() => setInspecting(null)} />
+      {adding && <MemberDialog onClose={() => setAdding(false)} />}
+      {bookmarklet && (
+        <BookmarkletDialog
+          publicUrl={publicUrl}
+          userId={meId}
+          onClose={() => setBookmarklet(false)}
+        />
       )}
-      {bookmarklet.code !== null && <BookmarkletPanel code={bookmarklet.code} />}
+      {inspecting && (
+        <MemberServicesDialog user={inspecting} onClose={() => setInspecting(null)} />
+      )}
+      {tokensFor && <TokensDialog user={tokensFor} onClose={() => setTokensFor(null)} />}
     </section>
   );
 }

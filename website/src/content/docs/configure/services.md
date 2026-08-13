@@ -35,7 +35,13 @@ An unconfigured service is a normal state, not a fault. Snagarr leaves it out of
 | Two services of one kind, one member | Allowed. Give them different names |
 | Two services of one kind and one name, one member | `409 conflict` |
 
-A new service is named `Default` when you send no name.
+A new service is named after its kind when you send no name, for example `Radarr - Default`. The second one of that kind is `Radarr - Default 2`.
+
+In the settings page, **Connect a service** collects the whole connection first and writes it when you select **Add connection**. **Test connection** works before that, on what you have typed, and it saves nothing. Abandoning the dialog leaves no record behind.
+
+**Test connection** also loads the quality profiles, the root folders and the Plex library sections. Until a test answers, those fields ask for the raw value instead. So the order is: type the address and the key, select **Test connection**, then pick from the real lists.
+
+A saved connection loads its lists when you open it. Change its address or key and test again to refresh them.
 
 ## Union state, personal action
 

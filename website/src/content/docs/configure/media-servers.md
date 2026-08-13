@@ -43,8 +43,10 @@ curl -X POST http://localhost:8080/api/v1/services \
 A `plex` card offers **Sign in with Plex**, so you never have to hunt for an `X-Plex-Token`.
 
 1. Select **Sign in with Plex**. A plex.tv window opens.
-2. Approve the code shown on the card.
-3. Choose one of your servers. Snagarr fills in the URL and the token.
+2. Approve the code shown in the dialog.
+3. Choose one of your servers. Snagarr fills in the token.
+
+Snagarr fills in the token only. The **URL** stays what you typed, because plex.tv reports the addresses your Plex account knows, not the one this Snagarr can reach. Each server is listed once, whatever the number of accounts it is shared with.
 
 The flow uses three endpoints:
 

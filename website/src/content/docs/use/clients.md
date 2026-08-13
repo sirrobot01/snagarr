@@ -66,6 +66,15 @@ The **List** screen holds the poster grid, filtered by the chips **All**, **Read
 
 The API is wider than the buttons. `POST /api/v1/items/{id}/send` accepts any token and spends the caller's own service, and `DELETE /api/v1/items/{id}` accepts the capturer. A member uses `curl` for both today.
 
+### Add it to a home screen
+
+The client carries a web app manifest, so a phone can keep it beside the other applications.
+
+- **iOS.** Open Snagarr in Safari. Select the share button, then **Add to Home Screen**.
+- **Android.** Open Snagarr in Chrome. Select the menu, then **Install app**.
+
+It opens without browser chrome and keeps the session it signed in with. This installs no software: it is the same web client behind an icon.
+
 ## Apple Shortcut
 
 Snagarr publishes one Shortcut, named **Snag**. Apple signs it, so it imports with no untrusted-shortcut prompt.
@@ -74,12 +83,12 @@ Snagarr publishes one Shortcut, named **Snag**. Apple signs it, so it imports wi
 https://www.icloud.com/shortcuts/c4b4dabe0b55481c9fe35fac0a4a266b
 ```
 
-That link is the default value of `general.shortcut_url`. A fresh install needs no configuration: the **Install the iOS Shortcut** button on the Snag screen already opens it.
+Open that link on the device. Snagarr keeps no copy of it in the settings: the Shortcut is the same for every install, and the address and token come from the import questions.
 
 ### Install it
 
-1. Get a token. An admin issues one under **Settings → Household & tokens**, or with `POST /api/v1/users/{id}/tokens`.
-2. Open the link on the device. The **Install the iOS Shortcut** button opens the same link.
+1. Get a token. An admin issues one under **Settings → Household access → Tokens**, or with `POST /api/v1/users/{id}/tokens`.
+2. Open the link on the device.
 3. Tap **Get Shortcut**.
 4. Answer `What is your Snagarr address?`.
 5. Answer `Paste your Snagarr token`.
@@ -155,7 +164,7 @@ An iCloud link is public, so it cannot carry a token. Import questions collect t
 13. Click **Details**. Select **Show in Share Sheet**. A **Receive** action appears at the top of the shortcut.
 14. Click **Any** in that **Receive** action. Limit the input types to **URLs** and **Text**.
 15. Click the share button. Choose **Copy iCloud Link**.
-16. Paste the link into Snagarr under **Settings → General → iOS Shortcut link**, or set `SNAGARR_SHORTCUT_URL`.
+16. Send the link to the people who need it.
 17. Type your real address and token back into your own copy.
 
 :::caution[Publish a reachable address]
@@ -167,11 +176,12 @@ Whatever you put in the URL **Text** action is the default every importer sees. 
 The bookmarklet posts the current page URL.
 
 1. Open the settings page as an admin.
-2. Go to **Household & tokens**.
-3. Select **Generate bookmarklet**.
-4. Copy the generated code. It carries a new token, readable once.
-5. Make a browser bookmark. Paste the code into the address field.
-6. Name the bookmark `Snag`.
+2. Go to **Household access**.
+3. Select **Browser bookmarklet**.
+4. Select **Generate link**.
+5. Copy the generated code. It carries a new token, readable once.
+6. Make a browser bookmark. Paste the code into the address field.
+7. Name the bookmark `Snag`.
 
 ```js
 javascript:(function(){fetch('https://snagarr.example.com/api/v1/capture',{method:'POST',headers:{'Content-Type':'application/json','Authorization':'Bearer sngr_your_token'},body:JSON.stringify({url:location.href,source:'bookmarklet'})}).then(function(r){alert(r.ok?'Snagged':'Snagarr said '+r.status)}).catch(function(e){alert('Snagarr unreachable: '+e)})})()

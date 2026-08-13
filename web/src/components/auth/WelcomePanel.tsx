@@ -1,3 +1,5 @@
+import { Logo } from '../Logo';
+
 const features = [
   {
     index: '01',
@@ -19,6 +21,7 @@ const features = [
 export function BrandMark({ compact = false }: { compact?: boolean }) {
   return (
     <div className="sg-auth-brand" data-compact={compact || undefined}>
+      <Logo size={compact ? 22 : 26} />
       <span>Snagarr</span>
     </div>
   );

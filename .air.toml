@@ -1,9 +1,9 @@
 root = "."
-tmp_dir = "tmp"
+tmp_dir = "bin"
 
 [build]
-  cmd = "go build -o ./tmp/snagarr ./cmd/snagarr"
-  bin = "./tmp/snagarr"
+  cmd = "go build -o ./bin/snagarr ./cmd/snagarr"
+  bin = "./bin/snagarr"
   args_bin = ["serve"]
   include_ext = ["go", "sql"]
   exclude_dir = ["web", "dist", "bin", "tmp", "data", "node_modules", ".venv", ".ven", ".idea", ".stfolder", "website"]

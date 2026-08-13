@@ -10,6 +10,28 @@ export default defineConfig({
 			title: 'Snagarr',
 			description:
 				'Snagarr captures a film or show, resolves it against TMDB, sends it to Radarr or Sonarr, and puts it in a collection on your media server when the file lands.',
+			logo: {
+				src: './src/assets/snagarr-mark.svg',
+				alt: 'Snagarr',
+			},
+			favicon: '/favicon.svg',
+			head: [
+				// The base path is not applied to a raw head tag, so it is written out.
+				{
+					tag: 'link',
+					attrs: {
+						rel: 'icon',
+						href: '/snagarr/favicon-32.png',
+						sizes: '32x32',
+						type: 'image/png',
+					},
+				},
+				{
+					tag: 'link',
+					attrs: { rel: 'apple-touch-icon', href: '/snagarr/apple-touch-icon.png' },
+				},
+				{ tag: 'meta', attrs: { name: 'theme-color', content: '#201e1d' } },
+			],
 			social: [
 				{
 					icon: 'github',

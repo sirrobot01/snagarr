@@ -101,9 +101,6 @@ export interface StatusResponse {
     running: boolean;
   };
   services: Record<string, boolean>;
-  /** `general.shortcut_url`, repeated here because /settings is admin only and a
-      member still needs the link. Absent on a server that predates it. */
-  shortcut_url?: string;
 }
 
 export interface HouseholdUser {
@@ -145,11 +142,8 @@ export interface GeneralSettings {
   /** Go duration string. The reconcile loop re-reads it, so a change needs no restart. */
   reconcile_interval: string;
   public_url: string;
-  /** The iCloud link the operator published from the Shortcuts app. Apple signs
-      a shortcut shared that way, so it imports with no untrusted-shortcut prompt. */
-  shortcut_url: string;
-  /** Returned in clear text on purpose — the operator pastes it into Radarr. */
-  webhook_secret: string;
+  /** Hands a resolved capture to the capturer's own Radarr or Sonarr. On by default. */
+  auto_send: boolean;
   configured: boolean;
   locked?: boolean;
 }

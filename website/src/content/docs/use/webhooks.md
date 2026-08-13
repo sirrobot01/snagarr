@@ -15,7 +15,7 @@ Snagarr acts on two kinds of event:
 ## URL
 
 ```
-POST <public url>/api/v1/webhooks/<service>?secret=<webhook secret>
+POST <public url>/api/v1/webhooks/<service>
 ```
 
 | `<service>` | Sender |
@@ -29,50 +29,34 @@ POST <public url>/api/v1/webhooks/<service>?secret=<webhook secret>
 `emby` and `jellyfin` run the same handler; either name works for either server.
 
 ```
-https://snagarr.example.com/api/v1/webhooks/radarr?secret=8f3c1a9e5d2b740c6e1f8a3d9b0c2e47
+https://snagarr.example.com/api/v1/webhooks/radarr
 ```
-
-These routes take no bearer token. The secret travels in the query string, because Radarr, Tautulli and Emby cannot all set request headers.
 
 | Status | Meaning |
 |--------|---------|
 | `204 No Content` | The payload was read. Also the answer when nothing matched. |
-| `401 Unauthorized` | The `secret` parameter is missing or wrong. |
+| `401 Unauthorized` | The credential is missing, wrong, or revoked. |
 | `404 Not Found` | The service name in the path is unknown. |
 
 Snagarr answers `204` for a payload it cannot use, so a sender never retries.
 
-## The secret
+## Authentication
 
-Snagarr generates 32 hexadecimal characters on first start and stores them as `general.webhook_secret`. It returns in clear text, unlike every other secret. It has no `SNAGARR_*` override.
+A webhook authenticates as a household member. There is no separate webhook secret. Snagarr accepts three forms:
 
-Read it in **Settings → General**, which also prints the finished webhook URL beside it. Or read it from the API:
+| Form | What to send | Senders |
+|------|--------------|---------|
+| Username and password | The member's sign-in details, as HTTP basic authentication | Radarr, Sonarr |
+| Token | `Authorization: Bearer sngr_…` | Tautulli, Jellyfin, and any sender that sets headers |
+| Token | `?token=sngr_…` on the URL | Emby, and any sender that sets no header |
 
-```sh
-curl -s http://localhost:8080/api/v1/settings \
-  -H "Authorization: Bearer sngr_your_admin_token"
-```
+Give the webhooks their own token. You then revoke that one token to stop them, and the member keeps their other clients. See [Tokens](/snagarr/start/first-run/#tokens).
 
-```json
-{ "general": { "reconcile_interval": "15m0s", "public_url": "",
-               "webhook_secret": "8f3c1a9e5d2b740c6e1f8a3d9b0c2e47" } }
-```
+A revoked token, a wrong password and an unknown username all return `401`.
 
-To replace it:
-
-1. Make a value: `openssl rand -hex 16`.
-2. Write it:
-
-   ```sh
-   curl -X PUT http://localhost:8080/api/v1/settings \
-     -H "Authorization: Bearer sngr_your_admin_token" \
-     -H "Content-Type: application/json" \
-     -d '{"general":{"webhook_secret":"8f3c1a9e5d2b740c6e1f8a3d9b0c2e47"}}'
-   ```
-
-3. Update every webhook URL.
-
-The new secret applies at once. Do not set it to an empty string: Snagarr then rejects every webhook until the next start-up generates a replacement.
+:::caution[Use HTTPS]
+Basic authentication and a bearer token both travel in clear text over HTTP. On a local network that is the same exposure as the old shared secret. Across the internet, put Snagarr behind TLS.
+:::
 
 ## Radarr
 
@@ -80,16 +64,18 @@ The new secret applies at once. Do not set it to an empty string: Snagarr then r
 2. Select **+**. Choose **Webhook**.
 3. Set **Name** to `Snagarr`.
 4. Turn on **On Import**, and **On Import Complete** if your version has it.
-5. Set **URL** to `<public url>/api/v1/webhooks/radarr?secret=<secret>`.
+5. Set **URL** to `<public url>/api/v1/webhooks/radarr`.
 6. Set **Method** to `POST`.
-7. Select **Test**. Radarr must report success.
-8. Select **Save**.
+7. Set **Username** to a household username.
+8. Set **Password** to that member's password.
+9. Select **Test**. Radarr must report success.
+10. Select **Save**.
 
 Leave the other triggers off. Snagarr ignores them.
 
 ## Sonarr
 
-Follow the Radarr steps with the URL `<public url>/api/v1/webhooks/sonarr?secret=<secret>`.
+Follow the Radarr steps with the URL `<public url>/api/v1/webhooks/sonarr`.
 
 Sonarr must send `series.tmdbId`. Older versions send only `series.tvdbId`; Snagarr then does nothing with the webhook and the reconcile loop marks the episode available on its next pass.
 
@@ -97,12 +83,13 @@ Sonarr must send `series.tmdbId`. Older versions send only `series.tvdbId`; Snag
 
 1. Open Tautulli. Go to **Settings → Notification Agents**.
 2. Select **Add a new notification agent**. Choose **Webhook**.
-3. Set **Webhook URL** to `<public url>/api/v1/webhooks/tautulli?secret=<secret>`.
+3. Set **Webhook URL** to `<public url>/api/v1/webhooks/tautulli`.
 4. Set **Webhook Method** to `POST`.
-5. Open the **Triggers** tab. Turn on **Watched**, and nothing else.
-6. Open the **Data** tab. Open the **Watched** section.
-7. Set **JSON Data** to the body below.
-8. Select **Save**.
+5. Set **Webhook Headers** to `{"Authorization": "Bearer sngr_your_token"}`.
+6. Open the **Triggers** tab. Turn on **Watched**, and nothing else.
+7. Open the **Data** tab. Open the **Watched** section.
+8. Set **JSON Data** to the body below.
+9. Select **Save**.
 
 ```json
 {
@@ -121,7 +108,7 @@ Snagarr reads no event name from a playback payload. Any payload it can match ma
 
 1. Open Emby. Go to **Settings → Notifications**.
 2. Select **Add Notification**. Choose **Webhooks**.
-3. Set **URL** to `<public url>/api/v1/webhooks/emby?secret=<secret>`.
+3. Set **URL** to `<public url>/api/v1/webhooks/emby?token=sngr_your_token`.
 4. Set **Request content type** to `application/json`.
 5. Turn on the playback-stop event only.
 6. Limit the events to your movie and show libraries.
@@ -136,7 +123,7 @@ Jellyfin needs the **Webhook** plugin, which builds its payload from a template.
 1. Install the Webhook plugin. Restart Jellyfin.
 2. Go to **Dashboard → Plugins → Webhook**.
 3. Select **Add Generic Destination**.
-4. Set **Webhook URL** to `<public url>/api/v1/webhooks/jellyfin?secret=<secret>`.
+4. Set **Webhook URL** to `<public url>/api/v1/webhooks/jellyfin`. Add the header `Authorization: Bearer sngr_your_token`, or put `?token=sngr_your_token` on the URL if your plugin version sets no headers.
 5. Turn on **Playback Stop** only.
 6. Turn on the **Movies** and **Episodes** item types.
 7. Set the template to the body below.
@@ -197,16 +184,17 @@ Playback:
 
 ```sh
 curl -i -X POST \
-  "http://localhost:8080/api/v1/webhooks/radarr?secret=YOUR_SECRET" \
+  "http://localhost:8080/api/v1/webhooks/radarr" \
+  -u "your-username:your-password" \
   -H "Content-Type: application/json" \
   -d '{"eventType":"Download","movie":{"tmdbId":1233413}}'
 ```
 
 ```sh
 curl -i -X POST \
-  "http://localhost:8080/api/v1/webhooks/emby?secret=YOUR_SECRET" \
+  "http://localhost:8080/api/v1/webhooks/emby?token=sngr_your_token" \
   -H "Content-Type: application/json" \
   -d '{"Item":{"Type":"Movie","ProviderIds":{"Tmdb":"1233413"}}}'
 ```
 
-A correct secret returns `204`, a wrong one `401`. Check the effect with `GET /api/v1/items`. A webhook that returns `204` and changes nothing is covered in [Troubleshooting](/snagarr/reference/troubleshooting/#a-webhook-does-nothing).
+A correct credential returns `204`, a wrong one `401`. Check the effect with `GET /api/v1/items`. A webhook that returns `204` and changes nothing is covered in [Troubleshooting](/snagarr/reference/troubleshooting/#a-webhook-does-nothing).

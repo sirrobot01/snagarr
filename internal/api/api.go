@@ -69,6 +69,8 @@ func (s *Server) Handler() http.Handler {
 			r.Post("/services", s.createService)
 			r.Patch("/services/{id}", s.updateService)
 			r.Delete("/services/{id}", s.deleteService)
+			r.Post("/services/test", s.testDraft)
+			r.Post("/services/options", s.draftOptions)
 			r.Post("/services/{id}/test", s.testService)
 			r.Get("/services/{id}/options", s.serviceOptions)
 
@@ -119,8 +121,6 @@ func (s *Server) status(w http.ResponseWriter, r *http.Request) {
 		"version": buildVersion,
 		"counts":  counts,
 		"sync":    s.reconciler.Status(),
-		// The Snag empty state links to this, and /settings is admin-only.
-		"shortcut_url": s.settings.Get().General.ShortcutURL,
 		// Household-wide: one member's Radarr answers for everybody, because
 		// the list they all read is a shared one.
 		"services": map[string]bool{

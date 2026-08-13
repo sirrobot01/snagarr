@@ -15,8 +15,10 @@ import (
 // sender that sees an error retries, and none of these events are worth a retry
 // storm — the reconcile loop is the backstop for anything missed here.
 func (s *Server) webhook(w http.ResponseWriter, r *http.Request) {
-	if !s.verifyWebhookSecret(r) {
-		writeError(w, http.StatusUnauthorized, codeUnauthorized, "the webhook secret is not valid")
+	if !s.webhookAuthorized(r) {
+		w.Header().Set("WWW-Authenticate", `Basic realm="snagarr"`)
+		writeError(w, http.StatusUnauthorized, codeUnauthorized,
+			"send a household username and password, or a bearer token")
 		return
 	}
 	body, err := io.ReadAll(io.LimitReader(r.Body, 1<<20))

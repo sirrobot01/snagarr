@@ -15,8 +15,10 @@ export const CaptureBox = forwardRef<HTMLInputElement, Props>(function CaptureBo
 ) {
   const live = focused || value.length > 0;
 
+  // No sg-region: the rule under the field is this section's divider, and a
+  // second full-width border below it reads as a mistake.
   return (
-    <section className="sg-region sg-pad pb-4 pt-4 md:pb-[18px] md:pt-[26px]">
+    <section className="sg-pad pb-4 pt-4 md:pb-[18px] md:pt-[26px]">
       <div className="flex items-center gap-3">
         <input
           id={id}

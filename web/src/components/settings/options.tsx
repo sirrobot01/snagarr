@@ -1,15 +1,14 @@
 import { useEffect, useState } from 'react';
-import type { ArrKind, ServiceConfig } from '../../lib/types';
+import type { ArrKind, ServiceConfig, ServiceOptions } from '../../lib/types';
 import { SelectField, TextField } from './fields';
-import { useServiceOptions } from './service';
 
 interface Props {
   id: number;
   kind: ArrKind;
   config: ServiceConfig;
   locked: boolean;
-  /** The lookup reads the stored credentials, so unsaved edits hold it back. */
-  ready: boolean;
+  /** What the service answered. Absent until credentials have been accepted. */
+  options?: ServiceOptions;
   onChange: (values: ServiceConfig) => void;
 }
 
@@ -22,12 +21,15 @@ function freeSpace(bytes: number): string {
   return bytes > 0 ? ` · ${Math.round(bytes / 1e9)} GB free` : '';
 }
 
-/* Without stored credentials the live lookup cannot answer, so each field falls
-   back to the free text it would have asked for before the API existed. */
-export function ArrOptionFields({ id, kind, config, locked, ready, onChange }: Props) {
-  const options = useServiceOptions(id, ready);
-  const profiles = options.data?.quality_profiles ?? [];
-  const folders = options.data?.root_folders ?? [];
+/** Says how to get the real list, since the free-text fallback below is what a
+    reader sees when they have not asked for it yet. */
+const HINT = 'Select Test connection to load the list from the service.';
+
+/* Without credentials the service cannot answer, so each field falls back to
+   the free text it would have asked for before the lookup existed. */
+export function ArrOptionFields({ id, kind, config, locked, options, onChange }: Props) {
+  const profiles = options?.quality_profiles ?? [];
+  const folders = options?.root_folders ?? [];
   const profile = config.quality_profile_id ? String(config.quality_profile_id) : '';
 
   return (
@@ -50,6 +52,7 @@ export function ArrOptionFields({ id, kind, config, locked, ready, onChange }: P
           locked={locked}
           inputMode="numeric"
           placeholder="4"
+          description={HINT}
           onChange={(value) => onChange({ quality_profile_id: toId(value) })}
         />
       )}
@@ -74,6 +77,7 @@ export function ArrOptionFields({ id, kind, config, locked, ready, onChange }: P
           value={config.root_folder ?? ''}
           locked={locked}
           placeholder={kind === 'radarr' ? '/movies' : '/tv'}
+          description={HINT}
           onChange={(value) => onChange({ root_folder: value })}
         />
       )}
@@ -81,18 +85,18 @@ export function ArrOptionFields({ id, kind, config, locked, ready, onChange }: P
   );
 }
 
-export function SectionsField({ id, config, locked, ready, onChange }: Omit<Props, 'kind'>) {
-  const options = useServiceOptions(id, ready);
-  const sections = options.data?.sections ?? [];
+export function SectionsField({ id, config, locked, options, onChange }: Omit<Props, 'kind'>) {
+  const sections = options?.sections ?? [];
   const selected = config.section_ids ?? [];
   const joined = selected.join(', ');
   const [value, setValue] = useState(joined);
 
   useEffect(() => setValue(joined), [id, joined]);
 
-  const discovered = sections.length > 0
-    ? ` Available: ${sections.map((section) => `${section.title} (${section.id})`).join(', ')}.`
-    : '';
+  const discovered =
+    sections.length > 0
+      ? ` Available: ${sections.map((section) => `${section.title} (${section.id})`).join(', ')}.`
+      : ` ${HINT}`;
 
   return (
     <TextField

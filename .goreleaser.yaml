@@ -87,6 +87,10 @@ dockers_v2:
     ids:
       - snagarr
     dockerfile: Dockerfile.release
+    # The entrypoint drops to PUID:PGID and is not a build artifact, so buildx
+    # only sees it if it is named here.
+    extra_files:
+      - scripts/entrypoint.sh
     images:
       - ghcr.io/sirrobot01/snagarr
       - docker.io/cy01/snagarr

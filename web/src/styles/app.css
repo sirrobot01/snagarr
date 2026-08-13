@@ -27,6 +27,10 @@
 .sg-pad { padding-inline: clamp(16px, 3vw, 28px); }
 .sg-region { border-bottom: 1px solid var(--color-line); }
 
+/* The brand mark. Red is its own colour, not the colour of whatever it sits in,
+   so it is set here rather than inherited. */
+.sg-mark { flex: none; color: var(--color-accent); }
+
 .sg-theme-toggle {
   display: inline-grid;
   width: 42px;
@@ -118,8 +122,7 @@
 .sg-dot[data-state='error'] { background: var(--color-danger); box-shadow: 0 0 0 4px var(--color-danger-subtle); }
 .sg-card-name { font-family: var(--font-heading); font-size: 15px; font-weight: 680; }
 .sg-card-name[data-unset='1'] { color: var(--color-muted); }
-.sg-add-service { display: flex; align-items: flex-end; gap: 16px; padding-block: 20px 26px; }
-.sg-add-service .sg-section-heading { margin-right: auto; }
+.sg-toolbar { display: flex; flex-wrap: wrap; align-items: center; justify-content: space-between; gap: 12px; padding-block: 16px; }
 .sg-section-heading { display: flex; min-width: 0; align-items: flex-start; gap: 10px; }
 .sg-section-heading > svg { flex: none; margin-top: 3px; color: var(--color-accent); }
 .sg-field-grid { display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); gap: 14px; }
@@ -148,9 +151,7 @@
 .sg-auth-mobile-head { display: none; }
 .sg-auth-card { z-index: 1; width: min(100%, 440px); padding: clamp(24px, 4vw, 36px); border: 1px solid var(--color-divider); border-radius: var(--radius-xl); background: color-mix(in srgb, var(--color-surface-raised) 92%, transparent); box-shadow: var(--shadow-lg); -webkit-backdrop-filter: blur(18px); backdrop-filter: blur(18px); }
 .sg-auth-brand { position: relative; z-index: 1; display: inline-flex; align-items: center; gap: 11px; color: white; font-family: var(--font-heading); font-size: 18px; font-weight: 750; letter-spacing: -0.04em; }
-.sg-auth-brand-mark { display: grid; width: 40px; height: 40px; place-items: center; border: 1px solid rgb(255 255 255 / 0.14); border-radius: 13px; background: linear-gradient(145deg, #7772ff, #4f46d8); color: white; box-shadow: 0 10px 28px rgb(79 70 229 / 0.28); }
 .sg-auth-brand[data-compact] { color: var(--color-text); font-size: 16px; }
-.sg-auth-brand[data-compact] .sg-auth-brand-mark { width: 34px; height: 34px; border-radius: 11px; }
 .sg-auth-eyebrow { display: inline-flex; align-items: center; gap: 7px; margin-bottom: 10px; color: var(--color-accent); font-size: 11px; font-weight: 680; letter-spacing: 0.08em; text-transform: uppercase; }
 .sg-auth-eyebrow svg { width: 15px; height: 15px; }
 .sg-auth-visual-copy { position: relative; z-index: 1; max-width: 560px; margin-block: auto; padding-block: 56px; }
@@ -203,21 +204,13 @@
 }
 @media (max-width: 680px) {
   .sg-field-grid { grid-template-columns: 1fr; }
-  .sg-add-service { align-items: stretch; flex-direction: column; }
-  .sg-add-service .sg-section-heading { margin-right: 0; }
-  .sg-add-service .field { width: 100%; }
+  .sg-toolbar > .btn { width: 100%; justify-content: center; }
 }
 @media (max-width: 520px) {
   .sg-auth-shell { align-items: stretch; padding: 0; }
   .sg-auth-card { width: 100%; padding: 26px 20px; border: 0; border-radius: 0; background: transparent; box-shadow: none; }
   .sg-auth-mobile-head { margin: 0; padding: 14px 18px 0; }
 }
-
-/* -------------------------------------------------------------------------
-   Mockup contract
-   The working mockups in tmp/mockups are the visual source of truth. These
-   product-level rules deliberately keep the interface flat, square and ruled.
-   ---------------------------------------------------------------------- */
 
 body { background: var(--color-bg); font-weight: 400; line-height: 1.55; }
 h1, h2, h3, h4, h5, h6 { font-weight: 800; letter-spacing: -0.015em; }
@@ -332,17 +325,71 @@ h4 { font-size: 20px; }
 .sg-view-button { width: 36px; height: 36px; border-radius: 0; border-left: 1px solid var(--color-divider); }
 .sg-view-button:first-child { border-left: 0; }
 .sg-view-button[data-on='1'] { background: var(--color-text); color: var(--color-bg); box-shadow: none; }
-.sg-selbar { bottom: 0; width: 100%; max-width: none; margin: 0; border-width: 2px 0 0; border-radius: 0; background: var(--color-surface); box-shadow: none; backdrop-filter: none; }
+.sg-selbar { bottom: 0; width: 100%; max-width: none; flex-wrap: wrap; margin: 0; padding: 10px 16px; border-width: 2px 0 0; border-radius: 0; background: var(--color-surface); box-shadow: none; backdrop-filter: none; }
 
 .table { border-collapse: collapse; font-size: 14px; }
 .table th { padding: 8px; border-bottom: 2px solid var(--color-divider); font-size: 11px; font-weight: 600; letter-spacing: 0.02em; text-transform: none; }
 .table td { padding: 8px; }
 .dialog { padding: 16px; border: 2px solid var(--color-divider); border-radius: 0; background: var(--color-bg); }
 .sg-scrim { backdrop-filter: none; }
-.sg-sheet { inset-inline: 0; bottom: 0; top: 150px; border: 0; border-top: 2px solid var(--color-divider); border-radius: 0; background: var(--color-bg); }
+/* A short screen — a phone held sideways — keeps a usable sheet rather than a
+   fixed 150px of nothing above it. */
+.sg-sheet { inset-inline: 0; bottom: 0; top: min(150px, 25dvh); border: 0; border-top: 2px solid var(--color-divider); border-radius: 0; background: var(--color-bg); }
 .sg-pop { width: 400px; border-radius: 0; background: var(--color-bg); }
 .sg-pop-actions { gap: 0; padding: 0; border-top: 2px solid var(--color-divider); }
 .sg-pop-actions > .btn + .btn { border-left: 1px solid var(--color-line); }
+
+/* Modals. Every settings surface — a service, a member, their tokens, the
+   bookmarklet — is one of these. It is centred on a large screen and becomes a
+   bottom sheet on a phone, which is a matter for this file alone. */
+.sg-modal {
+  position: fixed;
+  z-index: 50;
+  top: 50%;
+  left: 50%;
+  display: flex;
+  width: min(560px, calc(100vw - 32px));
+  max-height: min(88dvh, 880px);
+  flex-direction: column;
+  border: 2px solid var(--color-divider);
+  background: var(--color-bg);
+  box-shadow: var(--shadow-lg);
+  transform: translate(-50%, -50%);
+  animation: sg-modal-in 160ms ease-out;
+}
+.sg-modal[data-size='sm'] { width: min(420px, calc(100vw - 32px)); }
+.sg-modal[data-size='lg'] { width: min(760px, calc(100vw - 32px)); }
+.sg-modal-head { display: flex; align-items: flex-start; gap: 12px; padding: 16px 20px; border-bottom: 2px solid var(--color-divider); }
+.sg-modal-title { margin: 0; overflow-wrap: anywhere; font-family: var(--font-heading); font-size: 19px; font-weight: 800; letter-spacing: -0.02em; }
+.sg-modal-copy { margin: 4px 0 0; color: var(--color-muted); font-size: 12px; line-height: 1.45; }
+.sg-modal-close { display: grid; width: 40px; height: 40px; flex: none; place-items: center; margin: -4px -8px 0 0; border: 0; background: transparent; color: var(--color-muted); cursor: pointer; }
+.sg-modal-close:hover { color: var(--color-accent); }
+.sg-modal-body { display: flex; min-height: 0; flex: 1; flex-direction: column; gap: 16px; overflow-y: auto; padding: 20px; overscroll-behavior: contain; -webkit-overflow-scrolling: touch; }
+.sg-modal-foot { display: flex; flex-wrap: wrap; align-items: center; gap: 8px; padding: 12px 20px; border-top: 2px solid var(--color-divider); }
+.sg-modal-status { display: flex; align-items: center; gap: 8px; margin: 0; color: var(--color-muted); font-size: 12px; font-weight: 600; }
+.sg-reveal { display: flex; flex-direction: column; gap: 8px; padding: 14px; border: 2px solid var(--color-accent); }
+.sg-token-form { display: flex; flex-direction: column; align-items: flex-start; gap: 12px; padding-top: 16px; border-top: 1px solid var(--color-line); }
+.sg-token-form > .field { width: 100%; }
+@keyframes sg-modal-in { from { opacity: 0; transform: translate(-50%, calc(-50% + 10px)); } }
+
+/* A connection reads as one row: what it is, whether it answers, nothing else
+   until the dialog opens. */
+.sg-tile { display: flex; width: 100%; min-height: 64px; align-items: center; gap: 12px; padding: 14px 16px; border: 0; background: var(--color-bg); color: inherit; cursor: pointer; font: inherit; text-align: left; }
+.sg-tile:hover { background: var(--color-hover); }
+.sg-tile:hover .sg-tile-name { color: var(--color-accent); }
+.sg-tile-icon { display: grid; width: 34px; height: 34px; flex: none; place-items: center; border: 1px solid var(--color-line); color: var(--color-accent); }
+.sg-tile-copy { display: flex; min-width: 0; flex: 1; flex-direction: column; gap: 2px; }
+.sg-tile-name { overflow: hidden; font-family: var(--font-heading); font-size: 15px; font-weight: 800; text-overflow: ellipsis; white-space: nowrap; }
+.sg-kind-grid { display: grid; grid-template-columns: repeat(auto-fill, minmax(150px, 1fr)); gap: 8px; }
+.sg-kind { display: flex; min-height: 84px; flex-direction: column; align-items: flex-start; justify-content: center; gap: 3px; padding: 14px; border: 1px solid var(--color-divider); background: transparent; color: inherit; cursor: pointer; font: inherit; text-align: left; }
+.sg-kind:hover:not(:disabled) { border-color: var(--color-accent); color: var(--color-accent); }
+.sg-kind:disabled { opacity: 0.5; cursor: not-allowed; }
+.sg-kind > svg { color: var(--color-accent); }
+.sg-kind-name { font-family: var(--font-heading); font-size: 14px; font-weight: 800; }
+
+/* Tables scroll inside their own box rather than pushing the page sideways. */
+.sg-table-wrap { width: 100%; overflow-x: auto; -webkit-overflow-scrolling: touch; }
+.sg-row-actions { display: flex; flex-wrap: wrap; justify-content: flex-end; gap: 4px; }
 
 .sg-cards { display: flex; grid-template-columns: none; flex-wrap: wrap; gap: 2px; padding: 0; border-block: 2px solid var(--color-divider); background: var(--color-divider); }
 .sg-cards > * { min-width: 0; flex: 1 1 280px; }
@@ -368,30 +415,19 @@ h4 { font-size: 20px; }
 .sg-card-section { border-top: 2px solid var(--color-divider); }
 .sg-card-section-title { font-weight: 600; letter-spacing: 0.02em; text-transform: none; }
 .sg-section-heading > svg { display: none; }
-.sg-add-service { padding: 20px; border-bottom: 2px solid var(--color-divider); }
+.sg-toolbar { border-bottom: 2px solid var(--color-divider); }
 .sg-field-lock { border-radius: 0; letter-spacing: 0; text-transform: none; }
 .sg-field-help code { border-radius: 0; }
 .sg-household { border-top: 2px solid var(--color-divider); }
 .sg-success { border: 0; background: var(--color-success-subtle); color: var(--color-success); font-weight: 600; }
 .sg-success-icon { color: var(--color-success); }
 .sg-error { color: var(--color-danger); }
-.sg-plex-servers { display: flex; flex-direction: column; gap: 10px; }
-.sg-plex-server { border: 1px solid var(--color-divider); }
-.sg-plex-server-head { display: flex; align-items: center; gap: 8px; padding: 9px 10px; border-bottom: 1px solid var(--color-line); }
-.sg-plex-server-head > strong { font-size: 13px; }
-.sg-plex-server-head > span:last-child { margin-left: auto; font-size: 11px; }
-.sg-plex-endpoints { display: flex; flex-direction: column; padding: 4px; }
-.sg-plex-endpoint { display: grid; min-height: 42px; grid-template-columns: 54px minmax(0, 1fr) auto; align-items: center; gap: 9px; padding: 7px 8px; border: 0; border-top: 1px solid var(--color-line); background: transparent; color: var(--color-text); cursor: pointer; text-align: left; }
-.sg-plex-endpoint[data-best='1'] { background: var(--color-success-subtle); }
-.sg-plex-reach { flex: none; font-size: 10px; font-weight: 600; }
-.sg-plex-reach[data-reach='ok'] { color: var(--color-success); }
-.sg-plex-reach[data-reach='no'] { color: var(--color-muted); }
-.sg-plex-endpoint:first-child { border-top: 0; }
-.sg-plex-endpoint:hover { background: var(--color-hover); }
-.sg-plex-route { color: var(--color-muted); font-size: 10px; font-weight: 600; }
-.sg-plex-route[data-route='local'] { color: var(--color-success); }
-.sg-plex-route[data-route='relay'] { color: var(--color-accent); }
-.sg-plex-uri { min-width: 0; overflow: hidden; font-size: 12px; text-overflow: ellipsis; white-space: nowrap; }
+.sg-plex-servers { display: flex; flex-direction: column; gap: 6px; }
+.sg-plex-server-pick { display: flex; min-height: 44px; align-items: center; gap: 9px; padding: 9px 10px; border: 1px solid var(--color-divider); background: transparent; color: var(--color-text); cursor: pointer; font: inherit; text-align: left; }
+.sg-plex-server-pick:hover { border-color: var(--color-accent); color: var(--color-accent); }
+.sg-plex-server-pick > svg { flex: none; }
+.sg-plex-server-name { min-width: 0; overflow: hidden; flex: 1; font-size: 13px; font-weight: 700; text-overflow: ellipsis; white-space: nowrap; }
+.sg-kind-group { display: flex; flex-direction: column; gap: 8px; }
 
 .sg-setup-card { max-width: 620px; border: 2px solid var(--color-divider); border-radius: 0; background: var(--color-bg); box-shadow: none; }
 .sg-progress { height: 8px; gap: 2px; padding: 0; }
@@ -446,7 +482,12 @@ h4 { font-size: 20px; }
   .nav-brand { margin-right: auto; }
   .nav-links { flex: 0; gap: 12px; }
   .nav-link { min-width: 0; padding: 0; }
-  .nav-account { display: none; }
+  /* The account menu holds the only way to sign out, so it survives on a
+     phone. Modernist hides its label, and the trigger has nothing else in it. */
+  .nav-account { display: block; }
+  .nav-account-trigger { width: auto; justify-content: flex-start; padding: 0 0 0 10px; }
+  .nav-account-copy { display: flex; max-width: 88px; }
+  .nav-menu { width: min(220px, calc(100vw - 24px)); }
   .sg-theme-toggle { min-width: 38px; padding: 0; }
   .sg-pad { padding-inline: 16px; }
   .sg-search { font-size: 26px; }
@@ -454,9 +495,42 @@ h4 { font-size: 20px; }
   .sg-foot { align-items: flex-start; padding-inline: 16px; }
 }
 
+/* Phones get sheets instead of centred dialogs, and stacked rows instead of a
+   table that pushes the page sideways. */
+@media (max-width: 640px) {
+  .sg-modal, .sg-modal[data-size='sm'], .sg-modal[data-size='lg'] {
+    top: auto;
+    right: 0;
+    bottom: 0;
+    left: 0;
+    width: 100%;
+    max-height: 92dvh;
+    border-width: 2px 0 0;
+    transform: none;
+    animation: sg-sheet-in 200ms ease-out;
+  }
+  .sg-modal-head, .sg-modal-foot { padding-inline: 16px; }
+  .sg-modal-body { padding: 16px; }
+  .sg-modal-foot > .btn { flex: 1 1 auto; justify-content: center; margin-left: 0; }
+  .sg-kind-grid { grid-template-columns: repeat(auto-fill, minmax(128px, 1fr)); }
+
+  .sg-table-stack thead { position: absolute; width: 1px; height: 1px; overflow: hidden; clip-path: inset(50%); white-space: nowrap; }
+  .sg-table-stack, .sg-table-stack tbody, .sg-table-stack tr, .sg-table-stack td { display: block; width: 100%; }
+  .sg-table-stack tr { padding: 12px 0; border-bottom: 2px solid var(--color-divider); }
+  .sg-table-stack tr:last-child { border-bottom: 0; }
+  .sg-table-stack td { display: flex; align-items: center; justify-content: space-between; gap: 12px; padding: 5px 0; border: 0; text-align: left; }
+  .sg-table-stack td::before { content: attr(data-label); flex: none; color: var(--color-muted); font-size: 11px; font-weight: 600; }
+  .sg-table-stack td:not([data-label]) { justify-content: flex-start; padding-top: 8px; }
+  .sg-table-stack .sg-row-actions { justify-content: flex-start; }
+}
+
 @media (max-width: 520px) {
-  .nav-links { gap: 10px; }
-  .nav-link { font-size: 13px; }
+  .nav-inner { gap: 8px; padding-inline: 12px; }
+  .nav-brand { flex: none; font-size: 16px; }
+  .nav-links { min-width: 0; gap: 10px; overflow-x: auto; scrollbar-width: none; }
+  .nav-links::-webkit-scrollbar { display: none; }
+  .nav-link { font-size: 13px; white-space: nowrap; }
+  .nav-account-copy { max-width: 68px; }
   .sg-auth-shell { min-height: 100dvh; padding: 0; background: var(--color-bg); }
   .sg-auth-mobile-head { margin: 0; padding: 16px; border-bottom: 2px solid var(--color-divider); }
   .sg-auth-card { padding: 28px 20px; border: 0; }

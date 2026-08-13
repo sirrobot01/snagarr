@@ -12,6 +12,7 @@ data/
 /nntpmock
 /dist/
 tmp/**
+.air/
 torrents.json
 logs/**
 auth.json

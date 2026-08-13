@@ -5,8 +5,17 @@
     <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover" />
     <meta name="color-scheme" content="dark light" />
     <meta name="description" content="Snagarr — capture what you want to watch." />
+    <meta name="theme-color" content="#201e1d" />
     <title>Snagarr</title>
-    <script>(function(){var t=localStorage.getItem('snagarr.theme')||'light';document.documentElement.dataset.theme=t})()</script>
+    <!-- Vite rewrites these against `base: './'`, exactly as it does the script
+         and stylesheet below. Every route is one segment deep, so `./` resolves
+         to the site root. A nested route would need `base: '/'` instead. -->
+    <link rel="icon" href="/favicon.svg" type="image/svg+xml" />
+    <link rel="icon" href="/favicon-32.png" sizes="32x32" type="image/png" />
+    <link rel="icon" href="/favicon-16.png" sizes="16x16" type="image/png" />
+    <link rel="apple-touch-icon" href="/apple-touch-icon.png" />
+    <link rel="manifest" href="/site.webmanifest" />
+    <script>(function(){var t=localStorage.getItem('snagarr.theme')||'dark';document.documentElement.dataset.theme=t})()</script>
   </head>
   <body>
     <div id="root"></div>

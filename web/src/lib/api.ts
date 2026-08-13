@@ -13,6 +13,8 @@ import type {
   SearchResponse,
   SendTarget,
   Service,
+  ServiceConfig,
+  ServiceKind,
   ServiceOptions,
   ServicePatch,
   Settings,
@@ -162,7 +164,17 @@ export const api = {
 
   testService: (id: number) => request<TestResult>(`/services/${id}/test`, { method: 'POST' }),
 
+  /** Tests what the user has typed. `id` lets the server fill in any secret
+      that came back masked, so an edit to the URL alone still tests. */
+  testDraft: (body: { id?: number; kind: ServiceKind; config: ServiceConfig }) =>
+    request<TestResult>('/services/test', { method: 'POST', ...json(body) }),
+
   serviceOptions: (id: number) => request<ServiceOptions>(`/services/${id}/options`),
+
+  /** The quality profiles, root folders and library sections the typed
+      credentials can reach. Saves nothing, so it works before a first save. */
+  draftOptions: (body: { id?: number; kind: ServiceKind; config: ServiceConfig }) =>
+    request<ServiceOptions>('/services/options', { method: 'POST', ...json(body) }),
 
   /* ── Plex sign-in ───────────────────────────────────────────────────────── */
 

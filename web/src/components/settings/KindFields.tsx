@@ -1,4 +1,4 @@
-import type { ArrKind, LibraryKind, ServiceConfig } from '../../lib/types';
+import type { ArrKind, LibraryKind, ServiceConfig, ServiceOptions } from '../../lib/types';
 import { CheckField, TextField } from './fields';
 import { ArrOptionFields, SectionsField } from './options';
 import { PlexSignIn } from './PlexSignIn';
@@ -8,7 +8,8 @@ interface Props<K> {
   kind: K;
   config: ServiceConfig;
   locked: boolean;
-  ready: boolean;
+  /** What the service answered, once credentials have been accepted. */
+  options?: ServiceOptions;
   set: (values: ServiceConfig) => void;
 }
 
@@ -23,7 +24,7 @@ const ARR_URL: Record<ArrKind, string> = {
   sonarr: 'http://sonarr.lan:8989',
 };
 
-export function LibraryFields({ id, kind, config, locked, ready, set }: Props<LibraryKind>) {
+export function LibraryFields({ id, kind, config, locked, options, set }: Props<LibraryKind>) {
   return (
     <>
       <TextField
@@ -47,11 +48,11 @@ export function LibraryFields({ id, kind, config, locked, ready, set }: Props<Li
         onChange={(value) => set({ token: value })}
       />
       {/* Plex can hand the token over itself, which beats hunting for one in
-          the XML of a library page. */}
-      {kind === 'plex' && !locked && (
-        <PlexSignIn onPicked={(url, token) => set({ url, token })} />
-      )}
-      <SectionsField id={id} config={config} locked={locked} ready={ready} onChange={set} />
+          the XML of a library page. It fills the token alone — the address
+          above is the one this Snagarr can actually reach, and only the
+          operator knows which that is. */}
+      {kind === 'plex' && !locked && <PlexSignIn onPicked={(token) => set({ token })} />}
+      <SectionsField id={id} config={config} locked={locked} options={options} onChange={set} />
       <TextField
         id={`svc-${id}-collection`}
         label="Collection name"
@@ -65,7 +66,7 @@ export function LibraryFields({ id, kind, config, locked, ready, set }: Props<Li
   );
 }
 
-export function ArrFields({ id, kind, config, locked, ready, set }: Props<ArrKind>) {
+export function ArrFields({ id, kind, config, locked, options, set }: Props<ArrKind>) {
   return (
     <>
       <TextField
@@ -93,7 +94,7 @@ export function ArrFields({ id, kind, config, locked, ready, set }: Props<ArrKin
         kind={kind}
         config={config}
         locked={locked}
-        ready={ready}
+        options={options}
         onChange={set}
       />
       <CheckField

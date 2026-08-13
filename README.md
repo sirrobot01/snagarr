@@ -1,5 +1,7 @@
 <div align="center">
 
+<img src="website/public/snagarr-512.png" alt="" width="84" height="84">
+
 # Snagarr
 
 **Snag it now, watch it later.**
@@ -36,6 +38,10 @@ services:
     image: ghcr.io/sirrobot01/snagarr:latest
     ports: ["8080:8080"]
     volumes: ["./data:/data"]
+    environment:
+      PUID: 1000
+      PGID: 1000
+      TZ: Europe/London
     restart: unless-stopped
 ```
 
@@ -44,6 +50,10 @@ docker compose up -d
 ```
 
 Open `http://localhost:8080` and create the first administrator account.
+
+`PUID` and `PGID` are the user and group the process runs as, the same pair
+Radarr and Sonarr take. Set them to your own (`id -u` and `id -g`) and the data
+directory ends up owned by you. Both default to `1000`.
 
 Binaries for linux, darwin, windows and freebsd are on the
 [releases page](https://github.com/sirrobot01/snagarr/releases). Run
@@ -66,7 +76,7 @@ Every service card has a **Test connection** button.
 | Client | How |
 |---|---|
 | Web | The add box is the home page, focused on load. `/` refocuses it. |
-| Apple Shortcut | Build one, share it as an iCloud link, store the link in `general.shortcut_url`. |
+| Apple Shortcut | Import the published one, or build your own and share it as an iCloud link. |
 | Bookmarklet | Generated in Settings. Sends the current page. |
 | Anything | `POST /api/v1/capture` with a bearer token. |
 
@@ -108,6 +118,7 @@ task build     # one binary with the UI inside, into bin/
 | `internal/{tmdb,arr,library,overseerr,notify}` | External clients, each behind a narrow interface |
 | `web` | React client, built into `internal/web/dist`, embedded at compile time |
 | `website` | Astro docs site |
+| `assets` | The mark, the app icon and the rules for using them |
 
 ## Credits
 

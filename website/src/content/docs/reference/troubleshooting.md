@@ -20,7 +20,8 @@ Set `SNAGARR_LOG_LEVEL=debug` and restart before you investigate anything. Debug
 | The UI returns 404, the API works | The binary was built without `internal/web/dist` | Run `task build`, not `go build` |
 | The browser blocks every API call | Duplicate CORS headers at the proxy | Remove the CORS headers from the proxy |
 | The app breaks under `/snagarr/` | The client calls `/api/v1` from the domain root | Serve Snagarr on its own host |
-| `permission denied` on the data directory | The image runs as UID 65532 | `sudo chown -R 65532:65532 ./data` |
+| `permission denied` on the data directory | `user:` in Compose pins an identity the entrypoint may not change | Drop `user:` and set `PUID`/`PGID`, or `chown` the directory to that user |
+| The data directory is owned by the wrong user | `PUID`/`PGID` are unset, so both default to `1000` | Set them to `id -u` and `id -g` |
 | A Sonarr send fails | Sonarr keys on TVDB, which Snagarr reads from TMDB | Set `tmdb.api_key` |
 | No ntfy push | The capturer owns no ntfy and no admin does either, or the item already sent one | One push per item, ever |
 | The collection stays empty | That service's `collection_name` is empty, or the server holds none of the titles | Set the name; a collection only names titles that server has |
@@ -30,7 +31,7 @@ Set `SNAGARR_LOG_LEVEL=debug` and restart before you investigate anything. Debug
 
 A webhook that returns `204` and changes nothing has one of these causes. Work down the list.
 
-1. **Wrong secret.** A wrong or missing `?secret=` returns `401`. Most senders log the status.
+1. **Wrong credential.** A missing, wrong, or revoked credential returns `401`. Most senders log the status.
 2. **Wrong service name.** An unknown name in the path returns `404`.
 3. **The title is not snagged.** Webhooks only update existing items. They never create one.
 4. **The payload carries no TMDB ID.** The most common cause. Sonarr must send `series.tmdbId`; older versions send only `series.tvdbId`.
@@ -41,7 +42,8 @@ Reproduce it by hand:
 
 ```sh
 curl -i -X POST \
-  "http://localhost:8080/api/v1/webhooks/radarr?secret=YOUR_SECRET" \
+  "http://localhost:8080/api/v1/webhooks/radarr" \
+  -u "your-username:your-password" \
   -H "Content-Type: application/json" \
   -d '{"eventType":"Download","movie":{"tmdbId":1233413}}'
 ```
@@ -117,4 +119,10 @@ curl http://localhost:8080/api/v1/health
 # {"status":"ok","version":"0.1.0"}
 ```
 
-The image is distroless and holds no shell and no `curl`, so an in-container `HEALTHCHECK` is not possible. Probe from outside the container.
+The image runs its own `HEALTHCHECK` against that endpoint, reading the port from `SNAGARR_ADDR`.
+
+```sh
+docker inspect --format '{{.State.Health.Status}}' snagarr
+```
+
+`starting` for the first ten seconds, then `healthy` or `unhealthy`.

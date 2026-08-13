@@ -20,6 +20,7 @@ import (
 
 type harness struct {
 	server      *httptest.Server
+	api         *Server
 	store       *store.Store
 	adminToken  string
 	memberToken string
@@ -43,10 +44,9 @@ func newHarness(t *testing.T) *harness {
 	}
 	log := slog.New(slog.NewTextHandler(io.Discard, nil))
 	reconciler := engine.NewReconciler(db, settings, log)
-	handler := New(db, settings, engine.NewResolver(db, log), reconciler,
-		http.NotFoundHandler(), log).Handler()
+	srv := New(db, settings, engine.NewResolver(db, log), reconciler, http.NotFoundHandler(), log)
 
-	h := &harness{store: db, server: httptest.NewServer(handler)}
+	h := &harness{store: db, api: srv, server: httptest.NewServer(srv.Handler())}
 	t.Cleanup(h.server.Close)
 
 	h.admin = &store.User{Username: "Mukhtar", Role: store.RoleAdmin}
@@ -110,6 +110,29 @@ func (h *harness) do(t *testing.T, method, path, token string, body any) *http.R
 	resp, err := h.server.Client().Do(req)
 	if err != nil {
 		t.Fatalf("%s %s: %v", method, path, err)
+	}
+	t.Cleanup(func() { resp.Body.Close() })
+	return resp
+}
+
+// basic posts with a username and a password, the way a Radarr or Sonarr
+// webhook connection does.
+func (h *harness) basic(t *testing.T, path, username, password string, body any) *http.Response {
+	t.Helper()
+	raw, err := json.Marshal(body)
+	if err != nil {
+		t.Fatalf("encode body: %v", err)
+	}
+	req, err := http.NewRequest(http.MethodPost, h.server.URL+path, bytes.NewReader(raw))
+	if err != nil {
+		t.Fatalf("build request: %v", err)
+	}
+	req.SetBasicAuth(username, password)
+	req.Header.Set("Content-Type", "application/json")
+
+	resp, err := h.server.Client().Do(req)
+	if err != nil {
+		t.Fatalf("POST %s: %v", path, err)
 	}
 	t.Cleanup(func() { resp.Body.Close() })
 	return resp
@@ -535,31 +558,72 @@ func TestServiceSecretsRoundTrip(t *testing.T) {
 	}
 }
 
-func TestWebhookRejectsWrongSecret(t *testing.T) {
+func TestWebhookRejectsUnknownCredentials(t *testing.T) {
 	h := newHarness(t)
 
-	resp := h.do(t, http.MethodPost, "/api/v1/webhooks/radarr?secret=wrong", "",
+	resp := h.do(t, http.MethodPost, "/api/v1/webhooks/radarr", "",
 		map[string]any{"eventType": "Download"})
 	if resp.StatusCode != http.StatusUnauthorized {
-		t.Errorf("wrong webhook secret = %d, want 401", resp.StatusCode)
+		t.Errorf("webhook with no credential = %d, want 401", resp.StatusCode)
+	}
+
+	resp = h.do(t, http.MethodPost, "/api/v1/webhooks/radarr", "sngr_nonsense",
+		map[string]any{"eventType": "Download"})
+	if resp.StatusCode != http.StatusUnauthorized {
+		t.Errorf("webhook with an unknown token = %d, want 401", resp.StatusCode)
+	}
+
+	resp = h.basic(t, "/api/v1/webhooks/radarr", "Mukhtar", "not-the-password",
+		map[string]any{"eventType": "Download"})
+	if resp.StatusCode != http.StatusUnauthorized {
+		t.Errorf("webhook with a wrong password = %d, want 401", resp.StatusCode)
+	}
+}
+
+// A Radarr or Sonarr webhook connection carries a username and a password, so
+// the credential is the one the member signs in with.
+func TestWebhookAcceptsBasicAuth(t *testing.T) {
+	h := newHarness(t)
+
+	hash, err := hashPassword("open-sesame")
+	if err != nil {
+		t.Fatalf("hash password: %v", err)
+	}
+	u := &store.User{Username: "kitchen-pi", PasswordHash: hash, Role: store.RoleMember}
+	if err := h.store.CreateUser(context.Background(), u); err != nil {
+		t.Fatalf("create user: %v", err)
+	}
+
+	resp := h.basic(t, "/api/v1/webhooks/radarr", "kitchen-pi", "open-sesame",
+		map[string]any{"eventType": "Download", "movie": map[string]any{"tmdbId": 999999}})
+	if resp.StatusCode != http.StatusNoContent {
+		t.Errorf("webhook with basic auth = %d, want 204", resp.StatusCode)
+	}
+}
+
+// Emby sets no header of its own, so the token has to be able to travel in the
+// query string.
+func TestWebhookAcceptsTokenInQuery(t *testing.T) {
+	h := newHarness(t)
+
+	resp := h.do(t, http.MethodPost, "/api/v1/webhooks/emby?token="+h.memberToken, "",
+		map[string]any{"Item": map[string]any{"Type": "Movie"}})
+	if resp.StatusCode != http.StatusNoContent {
+		t.Errorf("webhook with a query token = %d, want 204", resp.StatusCode)
+	}
+
+	resp = h.do(t, http.MethodPost, "/api/v1/webhooks/emby?token=sngr_nonsense", "",
+		map[string]any{"Item": map[string]any{"Type": "Movie"}})
+	if resp.StatusCode != http.StatusUnauthorized {
+		t.Errorf("webhook with an unknown query token = %d, want 401", resp.StatusCode)
 	}
 }
 
 // Unmatched webhook payloads must still answer 204, or the sender retries.
 func TestWebhookAcceptsUnmatchedPayload(t *testing.T) {
 	h := newHarness(t)
-	ctx := context.Background()
 
-	settings, err := config.NewManager(ctx, h.store)
-	if err != nil {
-		t.Fatalf("settings: %v", err)
-	}
-	secret := settings.Get().General.WebhookSecret
-	if secret == "" {
-		t.Fatal("no webhook secret was generated on first run")
-	}
-
-	resp := h.do(t, http.MethodPost, "/api/v1/webhooks/radarr?secret="+secret, "",
+	resp := h.do(t, http.MethodPost, "/api/v1/webhooks/radarr", h.adminToken,
 		map[string]any{"eventType": "Download", "movie": map[string]any{"tmdbId": 999999}})
 	if resp.StatusCode != http.StatusNoContent {
 		t.Errorf("unmatched webhook = %d, want 204", resp.StatusCode)
@@ -596,30 +660,6 @@ func TestCrossOriginPreflight(t *testing.T) {
 	}
 }
 
-// The operator has to paste this into Radarr and Tautulli, so it must be
-// readable rather than masked like a credential.
-func TestWebhookSecretIsReadable(t *testing.T) {
-	h := newHarness(t)
-
-	resp := h.do(t, http.MethodGet, "/api/v1/settings", h.adminToken, nil)
-	got := decodeBody[map[string]map[string]any](t, resp)
-	secret, _ := got["general"]["webhook_secret"].(string)
-
-	if secret == "" {
-		t.Fatal("no webhook secret in the settings response")
-	}
-	if config.IsMasked(secret) {
-		t.Errorf("webhook_secret = %q, want it readable so it can be configured", secret)
-	}
-
-	// It must be the value the webhook routes actually accept.
-	resp = h.do(t, http.MethodPost, "/api/v1/webhooks/radarr?secret="+secret, "",
-		map[string]any{"eventType": "Test"})
-	if resp.StatusCode != http.StatusNoContent {
-		t.Errorf("webhook with the reported secret = %d, want 204", resp.StatusCode)
-	}
-}
-
 // Per-user services only mean something if a member can spend their own. They
 // must not reach an admin's, which is what the admin-only route used to guard.
 func TestMemberSendsOnlyToOwnServices(t *testing.T) {
@@ -647,5 +687,237 @@ func TestMemberSendsOnlyToOwnServices(t *testing.T) {
 		h.memberToken, map[string]any{"target": "radarr"})
 	if resp.StatusCode != http.StatusServiceUnavailable {
 		t.Errorf("member send with no own Radarr = %d, want 503", resp.StatusCode)
+	}
+}
+
+// The settings dialog creates nothing until Save, so a test has to run against
+// credentials that exist only in the browser.
+func TestTestDraftNeedsNoRecord(t *testing.T) {
+	h := newHarness(t)
+
+	resp := h.do(t, http.MethodPost, "/api/v1/services/test", h.memberToken, map[string]any{
+		"kind":   "radarr",
+		"config": map[string]any{"url": "http://127.0.0.1:1", "api_key": "nope"},
+	})
+	if resp.StatusCode != http.StatusOK {
+		t.Fatalf("POST /services/test = %d, want 200", resp.StatusCode)
+	}
+	got := decodeBody[map[string]any](t, resp)
+	if ok, _ := got["ok"].(bool); ok {
+		t.Error("an unreachable Radarr reported ok")
+	}
+	if msg, _ := got["message"].(string); msg == "" {
+		t.Error("a failed test carried no message")
+	}
+
+	services, err := h.store.UserServices(context.Background(), h.member.ID)
+	if err != nil {
+		t.Fatalf("read services: %v", err)
+	}
+	if len(services) != 0 {
+		t.Errorf("testing created %d service(s), want none", len(services))
+	}
+}
+
+// A masked secret means "the one already stored", so editing the URL alone
+// still tests against the real key.
+func TestTestDraftResolvesMaskedSecrets(t *testing.T) {
+	h := newHarness(t)
+
+	resp := h.do(t, http.MethodPost, "/api/v1/services", h.memberToken, map[string]any{
+		"kind":   "radarr",
+		"config": map[string]any{"url": "http://127.0.0.1:1", "api_key": "super-secret-4e2a"},
+	})
+	created := decodeBody[serviceDTO](t, resp)
+	masked, _ := created.Config["api_key"].(string)
+
+	resp = h.do(t, http.MethodPost, "/api/v1/services/test", h.memberToken, map[string]any{
+		"id":     created.ID,
+		"kind":   "radarr",
+		"config": map[string]any{"url": "http://127.0.0.1:2", "api_key": masked},
+	})
+	if resp.StatusCode != http.StatusOK {
+		t.Fatalf("POST /services/test = %d, want 200", resp.StatusCode)
+	}
+
+	stored, err := h.store.Service(context.Background(), created.ID)
+	if err != nil {
+		t.Fatalf("read stored service: %v", err)
+	}
+	if !bytes.Contains(stored.Config, []byte("super-secret-4e2a")) {
+		t.Error("the test overwrote the stored secret")
+	}
+	if bytes.Contains(stored.Config, []byte("127.0.0.1:2")) {
+		t.Error("the test saved the pending edit")
+	}
+}
+
+// fakeArr answers the two calls a Radarr add makes, and counts the adds.
+func fakeArr(added *int) *httptest.Server {
+	return httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		w.Header().Set("Content-Type", "application/json")
+		switch {
+		case strings.HasPrefix(r.URL.Path, "/api/v3/movie/lookup"):
+			_, _ = w.Write([]byte(`[{"tmdbId":603,"title":"The Matrix","year":1999}]`))
+		case r.URL.Path == "/api/v3/movie" && r.Method == http.MethodPost:
+			*added++
+			_, _ = w.Write([]byte(`{"id":7,"tmdbId":603,"title":"The Matrix","monitored":true,"hasFile":false}`))
+		default:
+			http.NotFound(w, r)
+		}
+	}))
+}
+
+func seedSnag(t *testing.T, h *harness, owner int64) *store.Item {
+	t.Helper()
+	it := &store.Item{
+		TMDBID: 603, MediaType: store.Movie, Title: "The Matrix", Status: store.StatusNew,
+		RawInput: "the matrix", Source: store.SourceWeb, CapturedBy: owner,
+	}
+	if err := h.store.CreateItem(context.Background(), it); err != nil {
+		t.Fatalf("seed item: %v", err)
+	}
+	return it
+}
+
+// "Add to *arr by default" spends the capturer's own download manager, so a
+// snagged title is already on its way without a second action.
+func TestAutoSendUsesTheCapturersArr(t *testing.T) {
+	h := newHarness(t)
+	added := 0
+	arr := fakeArr(&added)
+	defer arr.Close()
+
+	resp := h.do(t, http.MethodPost, "/api/v1/services", h.memberToken, map[string]any{
+		"kind":   "radarr",
+		"config": map[string]any{"url": arr.URL, "api_key": "key"},
+	})
+	if resp.StatusCode != http.StatusCreated {
+		t.Fatalf("POST /services = %d, want 201", resp.StatusCode)
+	}
+
+	it := seedSnag(t, h, h.member.ID)
+	h.api.autoSend(context.Background(), it.ID)
+
+	if added != 1 {
+		t.Errorf("radarr adds = %d, want 1", added)
+	}
+	got, err := h.store.Item(context.Background(), it.ID)
+	if err != nil {
+		t.Fatalf("read item: %v", err)
+	}
+	if got.Status != store.StatusMonitored {
+		t.Errorf("status = %q, want monitored", got.Status)
+	}
+}
+
+func TestAutoSendOffLeavesTheItemAlone(t *testing.T) {
+	h := newHarness(t)
+	added := 0
+	arr := fakeArr(&added)
+	defer arr.Close()
+
+	h.do(t, http.MethodPost, "/api/v1/services", h.memberToken, map[string]any{
+		"kind":   "radarr",
+		"config": map[string]any{"url": arr.URL, "api_key": "key"},
+	})
+	resp := h.do(t, http.MethodPut, "/api/v1/settings", h.adminToken, map[string]any{
+		"general": map[string]any{"auto_send": false},
+	})
+	if resp.StatusCode != http.StatusOK {
+		t.Fatalf("PUT /settings = %d, want 200", resp.StatusCode)
+	}
+
+	it := seedSnag(t, h, h.member.ID)
+	h.api.autoSend(context.Background(), it.ID)
+
+	if added != 0 {
+		t.Errorf("radarr adds = %d, want none while automatic sending is off", added)
+	}
+}
+
+// A member with no Radarr of their own must not spend an admin's.
+func TestAutoSendNeverSpendsAnotherMembersService(t *testing.T) {
+	h := newHarness(t)
+	added := 0
+	arr := fakeArr(&added)
+	defer arr.Close()
+
+	h.do(t, http.MethodPost, "/api/v1/services", h.adminToken, map[string]any{
+		"kind":   "radarr",
+		"config": map[string]any{"url": arr.URL, "api_key": "key"},
+	})
+
+	it := seedSnag(t, h, h.member.ID)
+	h.api.autoSend(context.Background(), it.ID)
+
+	if added != 0 {
+		t.Errorf("radarr adds = %d, want none", added)
+	}
+	got, _ := h.store.Item(context.Background(), it.ID)
+	if got.Status != store.StatusNew {
+		t.Errorf("status = %q, want it left alone", got.Status)
+	}
+}
+
+// The default has to be on, or "by default" means nothing.
+func TestAutoSendIsOnByDefault(t *testing.T) {
+	h := newHarness(t)
+
+	resp := h.do(t, http.MethodGet, "/api/v1/settings", h.adminToken, nil)
+	got := decodeBody[map[string]map[string]any](t, resp)
+	if on, _ := got["general"]["auto_send"].(bool); !on {
+		t.Error("auto_send is off on a fresh install")
+	}
+}
+
+// The quality profile and root folder lists are needed while a connection is
+// being filled in, which is before it exists.
+func TestDraftOptionsNeedNoRecord(t *testing.T) {
+	arr := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		w.Header().Set("Content-Type", "application/json")
+		switch r.URL.Path {
+		case "/api/v3/qualityprofile":
+			_, _ = w.Write([]byte(`[{"id":4,"name":"HD-1080p"}]`))
+		case "/api/v3/rootfolder":
+			_, _ = w.Write([]byte(`[{"path":"/movies","freeSpace":812340000000}]`))
+		default:
+			http.NotFound(w, r)
+		}
+	}))
+	defer arr.Close()
+
+	h := newHarness(t)
+	resp := h.do(t, http.MethodPost, "/api/v1/services/options", h.memberToken, map[string]any{
+		"kind":   "radarr",
+		"config": map[string]any{"url": arr.URL, "api_key": "key"},
+	})
+	if resp.StatusCode != http.StatusOK {
+		t.Fatalf("POST /services/options = %d, want 200", resp.StatusCode)
+	}
+
+	got := decodeBody[struct {
+		QualityProfiles []struct {
+			ID   int    `json:"id"`
+			Name string `json:"name"`
+		} `json:"quality_profiles"`
+		RootFolders []struct {
+			Path string `json:"path"`
+		} `json:"root_folders"`
+	}](t, resp)
+
+	if len(got.QualityProfiles) != 1 || got.QualityProfiles[0].Name != "HD-1080p" {
+		t.Errorf("quality profiles = %+v, want the one the server offered", got.QualityProfiles)
+	}
+	if len(got.RootFolders) != 1 || got.RootFolders[0].Path != "/movies" {
+		t.Errorf("root folders = %+v, want the one the server offered", got.RootFolders)
+	}
+
+	services, err := h.store.UserServices(context.Background(), h.member.ID)
+	if err != nil {
+		t.Fatalf("read services: %v", err)
+	}
+	if len(services) != 0 {
+		t.Errorf("looking options up created %d service(s), want none", len(services))
 	}
 }

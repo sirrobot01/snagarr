@@ -15,10 +15,6 @@ import (
 	"github.com/sirrobot01/snagarr/internal/store"
 )
 
-// defaultServiceName matches the name the environment seeding uses, so an
-// install that never opens this API still reads the same as one that does.
-const defaultServiceName = "Default"
-
 type serviceDTO struct {
 	ID        int64             `json:"id"`
 	UserID    int64             `json:"user_id"`
@@ -125,8 +121,10 @@ func (s *Server) createService(w http.ResponseWriter, r *http.Request) {
 		writeError(w, http.StatusBadRequest, codeBadRequest, "kind %q is not a service Snagarr knows", req.Kind)
 		return
 	}
+	// The name carries the kind, so a list of connections reads without a
+	// column for it. This matches the name the environment seeding uses.
 	if req.Name == "" {
-		req.Name = defaultServiceName
+		req.Name = config.SeededName(req.Kind)
 	}
 	if len(req.Config) == 0 {
 		req.Config = json.RawMessage("{}")
@@ -227,6 +225,67 @@ func (s *Server) testService(w http.ResponseWriter, r *http.Request) {
 	writeJSON(w, http.StatusOK, map[string]any{"ok": true, "message": message})
 }
 
+// testDraft tests credentials that have been typed but not saved. The settings
+// dialog creates nothing until Save, so there is no stored record to read, and
+// testing an existing service this way leaves the pending edits pending.
+func (s *Server) testDraft(w http.ResponseWriter, r *http.Request) {
+	svc, ok := s.decodeDraft(w, r)
+	if !ok {
+		return
+	}
+	message, err := ping(r.Context(), svc)
+	if err != nil {
+		writeJSON(w, http.StatusOK, map[string]any{"ok": false, "message": err.Error()})
+		return
+	}
+	writeJSON(w, http.StatusOK, map[string]any{"ok": true, "message": message})
+}
+
+// decodeDraft turns a typed-but-unsaved connection into the record the clients
+// are built from. It reads nothing and writes nothing beyond resolving the
+// secrets the client only ever held as a mask.
+func (s *Server) decodeDraft(w http.ResponseWriter, r *http.Request) (store.Service, bool) {
+	var req struct {
+		// ID is optional: it names the record whose stored secrets fill in for
+		// any the client sent back masked.
+		ID     int64             `json:"id"`
+		Kind   store.ServiceKind `json:"kind"`
+		Config json.RawMessage   `json:"config"`
+	}
+	if !decode(w, r, &req) {
+		return store.Service{}, false
+	}
+	if !req.Kind.Valid() {
+		writeError(w, http.StatusBadRequest, codeBadRequest, "kind %q is not a service Snagarr knows", req.Kind)
+		return store.Service{}, false
+	}
+	if len(req.Config) == 0 {
+		req.Config = json.RawMessage("{}")
+	}
+
+	base := config.DefaultServiceConfig(req.Kind)
+	if req.ID != 0 {
+		stored, err := s.store.Service(r.Context(), req.ID)
+		if err != nil {
+			s.writeStoreError(w, err, "service")
+			return store.Service{}, false
+		}
+		u := userFrom(r)
+		if u.Role != store.RoleAdmin && stored.UserID != u.ID {
+			writeError(w, http.StatusForbidden, codeForbidden, "only an admin can reach another member's service")
+			return store.Service{}, false
+		}
+		base = stored.Config
+	}
+
+	merged, err := mergeConfig(base, req.Config)
+	if err != nil {
+		writeError(w, http.StatusBadRequest, codeBadRequest, "%v", err)
+		return store.Service{}, false
+	}
+	return store.Service{ID: req.ID, Kind: req.Kind, Config: merged}, true
+}
+
 func ping(ctx context.Context, svc store.Service) (string, error) {
 	switch {
 	case svc.Kind.Library():
@@ -271,25 +330,40 @@ func (s *Server) serviceOptions(w http.ResponseWriter, r *http.Request) {
 	if !ok {
 		return
 	}
+	s.writeOptions(w, r, *svc)
+}
+
+// draftOptions looks options up with credentials that have been typed but not
+// saved. A new Radarr has to offer its real quality profiles while it is being
+// filled in — that is the moment the reader needs the list.
+func (s *Server) draftOptions(w http.ResponseWriter, r *http.Request) {
+	svc, ok := s.decodeDraft(w, r)
+	if !ok {
+		return
+	}
+	s.writeOptions(w, r, svc)
+}
+
+func (s *Server) writeOptions(w http.ResponseWriter, r *http.Request, svc store.Service) {
 	ctx := r.Context()
 
 	switch {
 	case svc.Kind == store.KindRadarr:
-		built, err := integration.BuildRadarr(*svc)
+		built, err := integration.BuildRadarr(svc)
 		if err != nil {
 			writeError(w, http.StatusServiceUnavailable, codeNotConfigured, "%v", err)
 			return
 		}
 		s.writeArrOptions(ctx, w, built.Client)
 	case svc.Kind == store.KindSonarr:
-		built, err := integration.BuildSonarr(*svc)
+		built, err := integration.BuildSonarr(svc)
 		if err != nil {
 			writeError(w, http.StatusServiceUnavailable, codeNotConfigured, "%v", err)
 			return
 		}
 		s.writeArrOptions(ctx, w, built.Client)
 	case svc.Kind.Library():
-		built, err := integration.BuildLibrary(*svc)
+		built, err := integration.BuildLibrary(svc)
 		if err != nil {
 			writeError(w, http.StatusServiceUnavailable, codeNotConfigured, "%v", err)
 			return

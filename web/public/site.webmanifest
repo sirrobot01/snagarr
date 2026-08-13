@@ -1,0 +1,14 @@
+{
+  "name": "Snagarr",
+  "short_name": "Snagarr",
+  "description": "Snag it now, watch it later.",
+  "start_url": "/",
+  "scope": "/",
+  "display": "standalone",
+  "background_color": "#201e1d",
+  "theme_color": "#201e1d",
+  "icons": [
+    { "src": "/app-icon-192.png", "sizes": "192x192", "type": "image/png" },
+    { "src": "/app-icon-512.png", "sizes": "512x512", "type": "image/png" }
+  ]
+}

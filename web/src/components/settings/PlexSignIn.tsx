@@ -11,6 +11,9 @@ type Phase =
 
 const POLL_MS = 2000;
 
+/* One row per server the account reaches, named rather than addressed. Picking
+   one fills the token only: the URL is the operator's own answer to "which
+   address can this Snagarr reach?", and plex.tv cannot answer that for them. */
 export function PlexServerPicker({
   servers,
   token,
@@ -18,54 +21,37 @@ export function PlexServerPicker({
 }: {
   servers: PlexServer[];
   token: string;
-  onPicked: (url: string, token: string) => void;
+  onPicked: (token: string) => void;
 }) {
-  if (servers.length === 0) {
+  // plex.tv repeats a server once per shared account, so it is deduplicated on
+  // the identifier the machine actually keeps.
+  const unique = servers.filter(
+    (server, index) =>
+      servers.findIndex((other) => other.client_identifier === server.client_identifier) === index,
+  );
+
+  if (unique.length === 0) {
     return <p className="text-muted m-0 text-[13px]">This account reaches no Plex server.</p>;
   }
 
   return (
     <div className="sg-plex-servers">
-      {servers.map((server) => (
-        <section className="sg-plex-server" key={server.client_identifier}>
-          <div className="sg-plex-server-head">
-            <Server aria-hidden="true" size={16} />
-            <strong>{server.name}</strong>
-            <span className="text-muted">
-              {server.connections.length} endpoint{server.connections.length === 1 ? '' : 's'}
-            </span>
-          </div>
-          <div className="sg-plex-endpoints">
-            {server.connections.length === 0 ? (
-              <p className="text-muted m-0 text-[12px]">No address was returned for this server.</p>
-            ) : (
-              server.connections.map((connection, index) => {
-                const route = connection.local ? 'Local' : connection.relay ? 'Relay' : 'Remote';
-                // The list arrives best-first, so the first address that
-                // answered is the one to take.
-                const best = connection.reachable && index === 0;
-                return (
-                  <button
-                    key={`${connection.uri}-${index}`}
-                    type="button"
-                    className="sg-plex-endpoint"
-                    data-best={best ? '1' : undefined}
-                    aria-label={`Use ${server.name} at ${connection.uri}`}
-                    onClick={() => onPicked(connection.uri, token)}
-                  >
-                    <span className="sg-plex-route" data-route={route.toLowerCase()}>
-                      {route}
-                    </span>
-                    <span className="sg-plex-uri">{connection.uri}</span>
-                    <span className="sg-plex-reach" data-reach={connection.reachable ? 'ok' : 'no'}>
-                      {best ? 'Recommended' : connection.reachable ? 'Answers' : 'No answer'}
-                    </span>
-                  </button>
-                );
-              })
-            )}
-          </div>
-        </section>
+      {unique.map((server) => (
+        <button
+          key={server.client_identifier}
+          type="button"
+          className="sg-plex-server-pick"
+          aria-label={`Use the token for ${server.name}`}
+          onClick={() => onPicked(token)}
+        >
+          <Server aria-hidden="true" size={16} />
+          <span className="sg-plex-server-name">{server.name}</span>
+          <span className="sg-k">
+            {server.connections.some((connection) => connection.reachable)
+              ? 'Answers'
+              : 'No answer'}
+          </span>
+        </button>
       ))}
     </div>
   );
@@ -79,9 +65,9 @@ function reason(error: unknown): string {
   return error instanceof Error ? error.message : 'plex.tv is unreachable';
 }
 
-/** Trades a plex.tv PIN for a token, then lets the user pick one of their
-    servers. The caller stores the resulting URL and token in the service. */
-export function PlexSignIn({ onPicked }: { onPicked: (url: string, token: string) => void }) {
+/** Trades a plex.tv PIN for a token, then lets the user confirm which of their
+    servers it is for. The caller stores the token; the address stays theirs. */
+export function PlexSignIn({ onPicked }: { onPicked: (token: string) => void }) {
   const [phase, setPhase] = useState<Phase>({ step: 'idle' });
   const [starting, setStarting] = useState(false);
 
@@ -157,13 +143,14 @@ export function PlexSignIn({ onPicked }: { onPicked: (url: string, token: string
     return (
       <Panel>
         <p className="sg-k m-0 flex items-center gap-2">
-          <CheckCircle2 aria-hidden="true" size={15} /> Signed in · Choose a server
+          <CheckCircle2 aria-hidden="true" size={15} /> Signed in · Choose a server to take its
+          token
         </p>
         <PlexServerPicker
           servers={phase.servers}
           token={phase.token}
-          onPicked={(url, token) => {
-            onPicked(url, token);
+          onPicked={(token) => {
+            onPicked(token);
             setPhase({ step: 'idle' });
           }}
         />

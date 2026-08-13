@@ -1,4 +1,4 @@
-import type { Service, ServiceConfig } from '../../lib/types';
+import type { Service, ServiceConfig, ServiceOptions } from '../../lib/types';
 import type { ServiceDraft } from './draft';
 import { CheckField, TextField } from './fields';
 import { ArrFields, LibraryFields } from './KindFields';
@@ -7,21 +7,21 @@ import { isArr, isLibrary } from './service';
 interface Props {
   service: Service;
   draft: ServiceDraft;
-  /** True once the stored record has working credentials to look options up with. */
-  ready: boolean;
+  /** What the service answered, once credentials have been accepted. */
+  options?: ServiceOptions;
 }
 
 /** Renders the fields the kind's config document actually has. */
-export function ServiceFields({ service, draft, ready }: Props) {
+export function ServiceFields({ service, draft, options }: Props) {
   const { id, kind, locked } = service;
   const config = draft.config;
   const set = (values: ServiceConfig) => draft.set(values);
 
   if (isLibrary(kind)) {
-    return <LibraryFields id={id} kind={kind} config={config} locked={locked} ready={ready} set={set} />;
+    return <LibraryFields id={id} kind={kind} config={config} locked={locked} options={options} set={set} />;
   }
   if (isArr(kind)) {
-    return <ArrFields id={id} kind={kind} config={config} locked={locked} ready={ready} set={set} />;
+    return <ArrFields id={id} kind={kind} config={config} locked={locked} options={options} set={set} />;
   }
 
   if (kind === 'ntfy') {

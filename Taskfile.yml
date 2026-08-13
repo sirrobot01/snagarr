@@ -110,7 +110,7 @@ tasks:
   clean:
     desc: Remove the build output
     cmds:
-      - rm -rf bin dist web/dist internal/web/dist tmp
+      - rm -rf bin dist web/dist internal/web/dist
       # internal/web embeds this directory, so the package stops compiling if
       # the placeholder goes out with the build output.
       - mkdir -p internal/web/dist

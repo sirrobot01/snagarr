@@ -24,10 +24,21 @@ RUN go build -trimpath \
         -X github.com/sirrobot01/snagarr/internal/version.Date=${DATE}" \
       -o /snagarr ./cmd/snagarr
 
-FROM gcr.io/distroless/static:nonroot
-COPY --from=build /snagarr /snagarr
-USER nonroot:nonroot
+# Alpine rather than distroless: PUID/PGID needs a shell, a user database and
+# su-exec to drop privileges, and distroless has none of them.
+FROM alpine:3
+RUN apk add --no-cache ca-certificates su-exec tzdata
+COPY --from=build /snagarr /usr/bin/snagarr
+COPY scripts/entrypoint.sh /entrypoint.sh
+RUN chmod +x /entrypoint.sh
 EXPOSE 8080
 VOLUME /data
-ENV SNAGARR_DATA_DIR=/data
-ENTRYPOINT ["/snagarr"]
+ENV SNAGARR_DATA_DIR=/data \
+    SNAGARR_ADDR=:8080 \
+    PUID=1000 \
+    PGID=1000 \
+    UMASK=022
+HEALTHCHECK --interval=30s --timeout=5s --start-period=10s --retries=3 \
+    CMD wget -qO- "http://127.0.0.1:${SNAGARR_ADDR##*:}/api/v1/health" >/dev/null || exit 1
+ENTRYPOINT ["/entrypoint.sh"]
+CMD ["/usr/bin/snagarr"]

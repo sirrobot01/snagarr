@@ -1,7 +1,7 @@
-import { Globe2, Link2, Webhook } from 'lucide-react';
+import { Globe2, SendHorizontal, Webhook } from 'lucide-react';
+import { CardHead } from './CardHead';
 import type { CardProps } from './draft';
-import { CopyField, TextField } from './fields';
-import { CardHead } from './ServiceCard';
+import { CheckField, TextField } from './fields';
 
 export function GeneralCard({ settings, draft }: CardProps) {
   const current = { ...settings.general, ...draft.patch.general };
@@ -49,31 +49,36 @@ export function GeneralCard({ settings, draft }: CardProps) {
 
       <div className="sg-card-section">
         <h6 className="sg-card-section-title flex items-center gap-2">
-          <Link2 aria-hidden="true" size={14} /> iOS Shortcut
+          <SendHorizontal aria-hidden="true" size={14} /> Capture
         </h6>
-        <TextField
-          id="general-shortcut-url"
-          label="Published Shortcut link"
-          value={current.shortcut_url}
+        <CheckField
+          id="general-auto-send"
+          label="Send to Radarr or Sonarr automatically"
+          checked={current.auto_send}
           locked={current.locked}
-          inputMode="url"
-          type="url"
-          placeholder="https://www.icloud.com/shortcuts/…"
-          description="In Apple Shortcuts, choose Share → Copy iCloud Link, then paste it here."
-          onChange={(value) => draft.set('general', { shortcut_url: value })}
+          onChange={(checked) => draft.set('general', { auto_send: checked })}
         />
+        <p className="sg-field-help">
+          A snagged title nobody owns yet goes straight to the capturer’s own download manager.
+          Snagarr never spends another member’s service, so somebody with none connected keeps the
+          Send button. Turn this off to send everything by hand.
+        </p>
       </div>
 
       <div className="sg-card-section">
         <h6 className="sg-card-section-title flex items-center gap-2">
           <Webhook aria-hidden="true" size={14} /> Webhooks
         </h6>
-        <CopyField id="general-webhook" label="Webhook secret" value={current.webhook_secret} />
         <p className="sg-field-help break-all">
-          Add this URL to Radarr:{' '}
-          <code>{`${base}/api/v1/webhooks/radarr?secret=${current.webhook_secret}`}</code>. Change{' '}
-          <code>radarr</code> to <code>sonarr</code>, <code>tautulli</code>, or <code>emby</code> for
-          other senders.
+          Add this URL to Radarr: <code>{`${base}/api/v1/webhooks/radarr`}</code>. Change{' '}
+          <code>radarr</code> to <code>sonarr</code>, <code>tautulli</code>, <code>emby</code>, or{' '}
+          <code>jellyfin</code> for other senders.
+        </p>
+        <p className="sg-field-help">
+          Authenticate as a household member. Radarr and Sonarr have Username and Password fields
+          on a webhook connection — use a member’s sign-in details. A sender that sets its own
+          headers can send <code>Authorization: Bearer &lt;token&gt;</code>. One that can do
+          neither, such as Emby, can put <code>?token=&lt;token&gt;</code> on the URL.
         </p>
       </div>
     </section>

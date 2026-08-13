@@ -11,10 +11,12 @@ services:
     image: ghcr.io/sirrobot01/snagarr:latest
     ports: ["8080:8080"]
     volumes:
-      - snagarr:/data
+      - ./data:/data
+    environment:
+      PUID: 1000
+      PGID: 1000
+      TZ: Europe/London
     restart: unless-stopped
-volumes:
-  snagarr:
 ```
 
 ```sh
@@ -23,13 +25,37 @@ docker compose up -d
 
 Open `http://localhost:8080`, then continue at [First run](/snagarr/start/first-run/).
 
-### Bind mount
+### User and group
 
-The image runs as `nonroot`, UID 65532. A bind mount must be writable by that UID.
+| Variable | Default | Effect |
+|----------|---------|--------|
+| `PUID` | `1000` | User ID the process runs as |
+| `PGID` | `1000` | Group ID the process runs as |
+| `UMASK` | `022` | Mode mask for files Snagarr creates |
+| `TZ` | UTC | Time zone for log timestamps |
 
-1. Make the directory: `mkdir -p ./data`.
-2. Give it to the container user: `sudo chown -R 65532:65532 ./data`.
-3. Replace the volume line with `- ./data:/data`.
+These are the variables Radarr, Sonarr and Plex take, and they work the same
+way. Read yours with `id -u` and `id -g`.
+
+The container starts as root, gives the data directory to `PUID:PGID`, then
+drops to that user before Snagarr runs. Nothing else on the filesystem is
+touched. A bind mount needs no preparation: make the directory and start the
+container.
+
+`secret.key` stays mode `0600` whatever `UMASK` says. It decrypts every stored
+API key, so it is never group readable.
+
+### Running as an explicit user
+
+`user:` in Compose overrides `PUID` and `PGID`:
+
+```yaml
+    user: "1000:1000"
+```
+
+Docker sets the identity before the entrypoint runs, so Snagarr keeps it and
+changes no ownership. The data directory must already be writable by that user.
+Prepare it with `sudo chown -R 1000:1000 ./data`.
 
 ### Pin settings from the environment
 
@@ -40,20 +66,21 @@ The image runs as `nonroot`, UID 65532. A bind mount must be writable by that UI
       SNAGARR_RADARR_API_KEY: your_radarr_key
 ```
 
-`SNAGARR_TMDB_API_KEY` pins a setting and locks the TMDB card. `SNAGARR_RADARR_*` writes a Radarr [service](/snagarr/configure/services/) owned by the **first admin**, named `Default`, rewritten on every start and rendered read-only.
+`SNAGARR_TMDB_API_KEY` pins a setting and locks the TMDB card. `SNAGARR_RADARR_*` writes a Radarr [service](/snagarr/configure/services/) owned by the **first admin**, named after its kind, for example `Radarr - Default`, rewritten on every start and rendered read-only.
 
 Every other member connects their own services in the UI. No variable touches them. See [Environment variables](/snagarr/configure/environment/).
 
 ## Plain Docker
 
 ```sh
-docker volume create snagarr
-
 docker run -d \
   --name snagarr \
   --restart unless-stopped \
   -p 8080:8080 \
-  -v snagarr:/data \
+  -e PUID=1000 \
+  -e PGID=1000 \
+  -e TZ=Europe/London \
+  -v ./data:/data \
   ghcr.io/sirrobot01/snagarr:latest
 ```
 
@@ -198,7 +225,15 @@ curl http://localhost:8080/api/v1/health
 # {"status":"ok","version":"0.1.0"}
 ```
 
-`GET /api/v1/health` needs no token. The image is distroless and holds no shell and no `curl`, so an in-container `HEALTHCHECK` is not possible. Probe the endpoint from outside.
+`GET /api/v1/health` needs no token.
+
+The image carries its own `HEALTHCHECK` against that endpoint, so
+`docker ps` reports Snagarr as healthy or unhealthy without any Compose
+configuration. It reads the port from `SNAGARR_ADDR`.
+
+```sh
+docker inspect --format '{{.State.Health.Status}}' snagarr
+```
 
 ## Backup
 
@@ -259,3 +294,5 @@ task build     # builds the UI, then bin/snagarr
 | `task clean` | Removes the build output |
 
 `docker build -t snagarr:dev .` builds the client and the binary from source. `Dockerfile.release` is for GoReleaser only; it copies binaries GoReleaser already built.
+
+Both images end on Alpine and share `scripts/entrypoint.sh`, which is what reads `PUID` and `PGID`. GoReleaser has no source tree in its build context, so the script reaches the release image through `extra_files` in `.goreleaser.yaml`. Renaming or moving it means changing that list too.

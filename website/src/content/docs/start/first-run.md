@@ -72,10 +72,14 @@ Four ways to get one:
 
 | Source | Steps |
 |--------|-------|
-| Browser sign-in | Snagarr creates a browser session automatically; its secret is never displayed. |
-| Setup wizard | Last step, **Create a household token**. |
-| Settings page | **Generate bookmarklet** issues a token named `Bookmarklet` inside the generated code. |
+| Settings page | Open **Settings → Household access**. Find the member. Select **Tokens**. Name the token and select **Issue token**. |
+| Browser sign-in | Snagarr creates a browser session automatically. Its secret is never displayed. |
+| Settings page | **Browser bookmarklet** issues a token named `Bookmarklet` inside the generated code. |
 | API | `POST /api/v1/users/{id}/tokens` |
+
+The **Tokens** dialog shows the secret once, immediately after it is issued. Copy it then. Snagarr stores only a hash.
+
+Only an admin can open the dialog. To give a member a token, issue it for them and send it to them.
 
 ```sh
 curl -X POST http://localhost:8080/api/v1/users/1/tokens \
@@ -97,6 +101,8 @@ curl -X DELETE http://localhost:8080/api/v1/tokens/7 \
   -H "Authorization: Bearer sngr_your_admin_token"
 ```
 
-To revoke every token of one member, open the settings page, find the member in the household table and select **Revoke**.
+To revoke a token in the interface, open **Settings → Household access**. Find the member. Select **Tokens**. Select **Revoke** on the row. Snagarr asks you to confirm. Other tokens keep working.
+
+To revoke every token of one member, select **Revoke all** in the same dialog. This also ends their browser session. They sign in again to get a new one.
 
 `GET /api/v1/users/{id}/tokens` lists the name, the prefix and the last use. It never returns the token.

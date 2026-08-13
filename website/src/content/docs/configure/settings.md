@@ -34,16 +34,24 @@ Use a TMDB API key (v3).
 |-------|------|---------|----------|
 | `general.reconcile_interval` | duration | `15m0s` | `SNAGARR_RECONCILE_INTERVAL` |
 | `general.public_url` | string | *(empty)* | `SNAGARR_PUBLIC_URL` |
-| `general.shortcut_url` | string | Snagarr's published Shortcut | `SNAGARR_SHORTCUT_URL` |
-| `general.webhook_secret` | string | *(32 hex characters, generated)* | *(none)* |
+| `general.auto_send` | boolean | `true` | *(none)* |
 
 `reconcile_interval` is a Go duration string (`15m`, `1h`, `90s`). Zero or less falls back to 15 minutes. The value round-trips in long form: send `15m`, read `15m0s`. The loop reads the interval before each wait, so a change applies after the current wait ends without a restart.
 
 `public_url` is the URL an outside client uses, for example `https://snagarr.example.com`. It builds the ntfy click link and the bookmarklet.
 
-`shortcut_url` defaults to `https://www.icloud.com/shortcuts/c4b4dabe0b55481c9fe35fac0a4a266b`, the Shortcut Snagarr publishes. The Snag screen shows an **Install the iOS Shortcut** button while the value is set, and hides the button while it is empty. Replace it with your own iCloud link to publish a different Shortcut. See [Capture clients](/snagarr/use/clients/#apple-shortcut).
+`auto_send` hands a resolved capture to the capturer's own Radarr or Sonarr, with no second action. It is on by default.
 
-`webhook_secret` authenticates every inbound webhook. It has no environment override. See [Webhooks](/snagarr/use/webhooks/).
+| Condition | Result |
+|-----------|--------|
+| The title resolved and nobody owns it yet | Sent. The item reads `monitored` |
+| The title is already in a library, monitored or requested | Nothing happens |
+| The capturer owns no Radarr or Sonarr | Nothing happens. The **Send** button stays |
+| The download manager rejects it or cannot be reached | Nothing happens. Snagarr logs it and the capture still stands |
+
+Snagarr sends to the capturer's own service only. It never spends another member's, exactly as the **Send** button never does. A series goes to Sonarr, a film to Radarr; Overseerr is a manual send.
+
+There is no webhook secret. An inbound webhook authenticates as a household member, with a username and password or with a token. See [Webhooks](/snagarr/use/webhooks/).
 
 ## Secrets at rest
 
@@ -57,11 +65,8 @@ Snagarr cannot read any stored setting or service without it. A restored databas
 |-------|-------------------|
 | `tmdb.api_key` | Yes |
 | A service config `api_key` or `token` | Yes |
-| `general.webhook_secret` | No |
 
 A masked value comes back as `••••` plus the last four characters. Send it back unchanged to keep the stored secret.
-
-`general.webhook_secret` is encrypted at rest like the rest but returns in clear text, because you must paste it into Radarr and Tautulli.
 
 ## Environment overrides
 
@@ -69,7 +74,7 @@ An environment variable wins over the stored value. Snagarr applies the override
 
 Snagarr ignores an empty variable and an unparsable duration.
 
-An override locks the whole settings card, not one field: the UI renders the card read-only, because an edit there is overwritten on the next restart. `SNAGARR_PUBLIC_URL` locks the public URL, the reconcile interval and the Shortcut link on the General card.
+An override locks the whole settings card, not one field: the UI renders the card read-only, because an edit there is overwritten on the next restart. `SNAGARR_PUBLIC_URL` locks both the public URL and the reconcile interval on the General card.
 
 `GET /api/v1/settings` reports `locked` per section. Services carry their own `locked` flag per record.
 

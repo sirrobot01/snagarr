@@ -40,6 +40,8 @@ export function StepTmdb({ settings, draft }: CardProps) {
           result: test.result,
           pending: test.pending || save.isPending,
           run: () => void saveThenTest(),
+          // TMDB is a settings field, not a service, so it offers no options.
+          probed: null,
         }}
       />
       <a

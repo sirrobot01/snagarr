@@ -3,6 +3,7 @@ import { Link, useLocation } from 'wouter';
 
 import { clearToken } from '../lib/auth';
 import type { UserRef } from '../lib/types';
+import { Logo } from './Logo';
 import { ThemeToggle } from './ThemeToggle';
 
 const LINKS = [
@@ -39,8 +40,11 @@ export function Nav({ me }: { me: UserRef | undefined }) {
   return (
     <header className="nav">
       <div className="nav-inner">
+        {/* The label goes on a narrow screen and the mark carries the brand,
+            which is what the mark is for. */}
         <Link href="/" className="nav-brand" aria-label="Snagarr home">
-          Snagarr
+          <Logo size={20} />
+          <span className="nav-brand-label">Snagarr</span>
         </Link>
 
         <nav className="nav-links" aria-label="Main navigation">

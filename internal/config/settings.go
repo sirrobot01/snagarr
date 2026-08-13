@@ -2,8 +2,6 @@ package config
 
 import (
 	"context"
-	"crypto/rand"
-	"encoding/hex"
 	"encoding/json"
 	"errors"
 	"fmt"
@@ -45,14 +43,10 @@ type GeneralSettings struct {
 	ReconcileInterval Duration `json:"reconcile_interval"`
 	PublicURL         string   `json:"public_url"`
 
-	// ShortcutURL is the operator's published iCloud Shortcut link. Apple signs
-	// shortcuts shared that way, so it imports without the untrusted-shortcut
-	// prompt an unsigned file would trigger.
-	ShortcutURL string `json:"shortcut_url"`
-
-	// WebhookSecret authenticates the inbound webhook routes. It is readable
-	// on purpose: the operator has to paste it into Radarr and Tautulli.
-	WebhookSecret string `json:"webhook_secret"`
+	// AutoSend hands a resolved capture to the capturer's own Radarr or Sonarr
+	// without waiting for the Send button. It is on by default: snagging a
+	// title nobody owns yet almost always means "get this".
+	AutoSend bool `json:"auto_send"`
 }
 
 // Settings is what stays global once every integration belongs to a member:
@@ -68,10 +62,7 @@ func (s TMDBSettings) Configured() bool { return s.APIKey != "" }
 func defaults() Settings {
 	return Settings{General: GeneralSettings{
 		ReconcileInterval: Duration(15 * time.Minute),
-		// Snagarr's published Shortcut. Apple signs shortcuts shared as an
-		// iCloud link, so it imports with no untrusted-shortcut prompt, and its
-		// import questions collect the address and token from each person.
-		ShortcutURL: "https://www.icloud.com/shortcuts/c4b4dabe0b55481c9fe35fac0a4a266b",
+		AutoSend:          true,
 	}}
 }
 
@@ -130,12 +121,6 @@ func NewManager(ctx context.Context, s *store.Store) (*Manager, error) {
 	if err == nil {
 		if err := json.Unmarshal(raw, &m.current); err != nil {
 			return nil, fmt.Errorf("decode settings: %w", err)
-		}
-	}
-	if m.current.General.WebhookSecret == "" {
-		m.current.General.WebhookSecret = randomSecret()
-		if err := m.persist(ctx); err != nil {
-			return nil, err
 		}
 	}
 	m.locked = overlayEnv(&m.current)
@@ -213,12 +198,10 @@ func overlayEnv(s *Settings) map[string]bool {
 	strs := map[string]*string{
 		"SNAGARR_TMDB_API_KEY": &s.TMDB.APIKey,
 		"SNAGARR_PUBLIC_URL":   &s.General.PublicURL,
-		"SNAGARR_SHORTCUT_URL": &s.General.ShortcutURL,
 	}
 	paths := map[string]string{
 		"SNAGARR_TMDB_API_KEY": "tmdb.api_key",
 		"SNAGARR_PUBLIC_URL":   "general.public_url",
-		"SNAGARR_SHORTCUT_URL": "general.shortcut_url",
 	}
 	for name, field := range strs {
 		if v := os.Getenv(name); v != "" {
@@ -234,10 +217,4 @@ func overlayEnv(s *Settings) map[string]bool {
 		}
 	}
 	return locked
-}
-
-func randomSecret() string {
-	buf := make([]byte, 16)
-	rand.Read(buf)
-	return hex.EncodeToString(buf)
 }

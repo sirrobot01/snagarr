@@ -13,7 +13,7 @@ Base path `/api/v1`. All bodies are JSON. All timestamps are RFC 3339 UTC.
 | `GET` | `/auth/status` | none |
 | `POST` | `/auth/register` | none, first account only |
 | `POST` | `/auth/login` | none |
-| `POST` | `/webhooks/{service}` | secret in query |
+| `POST` | `/webhooks/{service}` | any member credential |
 | `GET` | `/me` | any token |
 | `GET` | `/status` | any token |
 | `POST` | `/capture` | any token |
@@ -29,6 +29,8 @@ Base path `/api/v1`. All bodies are JSON. All timestamps are RFC 3339 UTC.
 | `GET` | `/plex/servers` | any token |
 | `GET` `POST` | `/services` | any token |
 | `PATCH` `DELETE` | `/services/{id}` | owner, or admin |
+| `POST` | `/services/test` | any token |
+| `POST` | `/services/options` | any token |
 | `POST` | `/services/{id}/test` | owner, or admin |
 | `GET` | `/services/{id}/options` | owner, or admin |
 | `GET` `POST` | `/users` | admin |
@@ -60,7 +62,9 @@ instead of discarding their data. `GET /auth/status` returns
 API clients, Shortcuts and bookmarklets use the same bearer header. A token
 belongs to one user and can be revoked independently.
 
-`/api/v1/webhooks/*` takes no bearer token. It authenticates with `?secret=`.
+`/api/v1/webhooks/*` authenticates as a household member: HTTP basic with a
+username and password, `Authorization: Bearer`, or `?token=` for a sender that
+sets no header.
 
 A `member` may capture, read, build their own services, send to their own services, and resolve, archive or delete the items they captured. Everything else is admin-only and answers `403 forbidden`.
 
@@ -285,7 +289,7 @@ The caller's own services, disabled ones included.
   "config": { "url": "http://radarr.lan:7878", "api_key": "your_key" } }
 ```
 
-`201 Created` with the service. The caller owns it. `name` defaults to `Default`. Snagarr merges your `config` over the kind's defaults, so a new media server already reads `"collection_name": "Snagged"`.
+`201 Created` with the service. The caller owns it. `name` defaults to the kind, for example `Radarr - Default`. Snagarr merges your `config` over the kind's defaults, so a new media server already reads `"collection_name": "Snagged"`.
 
 | Error | Cause |
 |-------|-------|
@@ -308,7 +312,23 @@ The owner reaches both. An admin reaches anybody's. Any other caller gets `403 f
 { "ok": true, "message": "OK · 611 monitored" }
 ```
 
-`ok: false` carries the upstream failure in `message`, for example `401 — check token`. The test reads the **stored** record, so save an edit before you test it.
+`ok: false` carries the upstream failure in `message`, for example `401 — check token`. This form reads the **stored** record.
+
+### `POST /services/test`
+
+Tests credentials that are not stored, which is what the settings dialog uses: it creates nothing until you save.
+
+```json
+{ "kind": "radarr", "config": { "url": "http://radarr.lan:7878", "api_key": "…" } }
+```
+
+Send `id` as well to test an edit to a service that already exists. Any secret you echo back masked is read from that record, so changing the URL alone still tests against the real key. The request writes nothing: the stored config, the name and the enabled flag are all left alone.
+
+```json
+{ "id": 3, "kind": "radarr", "config": { "url": "http://radarr.lan:7878", "api_key": "••••4e2a" } }
+```
+
+The answer is the same shape as the stored form. Any household member may test their own; an admin may test anybody's.
 
 ### `GET /services/{id}/options`
 
@@ -318,6 +338,18 @@ The owner reaches both. An admin reaches anybody's. Any other caller gets `403 f
 ```
 
 A `radarr` or `sonarr` service answers with the pair above. A `plex`, `emby` or `jellyfin` service answers `{ "sections": [ { "id": "1", "title": "Movies", "type": "movie" } ] }`. Any other kind answers `400 bad_request`.
+
+Both lookups reach the service itself. Neither is cached on the server.
+
+### `POST /services/options`
+
+The same lists, for credentials that are not stored. This is what fills the quality profile and root folder fields while a connection is being built.
+
+```json
+{ "kind": "radarr", "config": { "url": "http://radarr.lan:7878", "api_key": "…" } }
+```
+
+Takes the same body as `POST /services/test`, including the optional `id` that resolves a masked secret, and answers in the same shape as the stored form. It writes nothing.
 
 ### `GET /users/{id}/services` — admin
 
@@ -413,14 +445,13 @@ Settings carry the TMDB key and the install-wide knobs. Nothing else. See [Setti
   "tmdb":    { "api_key": "••••4e2a", "configured": true, "locked": false },
   "general": { "reconcile_interval": "15m0s",
                "public_url": "http://localhost:8080",
-               "shortcut_url": "https://www.icloud.com/shortcuts/c4b4dabe0b55481c9fe35fac0a4a266b",
-               "webhook_secret": "3f8c1e…", "configured": true, "locked": false }
+               "auto_send": true, "configured": true, "locked": false }
 }
 ```
 
 Each section carries `configured` (the section holds enough to work) and `locked` (an environment variable pins a value in that section, so the UI renders the card read-only). Locking is reported per section, not per field. `general.configured` is always `true`.
 
-`tmdb.api_key` comes back as `••••` plus the last four characters. `general.webhook_secret` returns in clear text, because you must paste it into Radarr and Tautulli.
+`tmdb.api_key` comes back as `••••` plus the last four characters.
 
 Durations round-trip in Go format: `"15m"` is accepted and returns as `"15m0s"`.
 
@@ -449,15 +480,12 @@ Accepts a partial object of the same shape and merges it over the current values
   "version": "0.1.0",
   "counts": { "total": 24, "ready": 6, "pending": 15, "needs_review": 3, "archived": 2 },
   "sync": { "library_at": "…", "arr_at": "…", "collection_at": "…", "running": false },
-  "shortcut_url": "https://www.icloud.com/shortcuts/c4b4dabe0b55481c9fe35fac0a4a266b",
   "services": { "tmdb": true, "library": true, "radarr": true, "sonarr": true,
                 "overseerr": false, "ntfy": true }
 }
 ```
 
 `services` is household-wide: each flag is true when **anybody** has a working service of that kind. It never says whose.
-
-`shortcut_url` repeats `general.shortcut_url`, because `/settings` is admin-only and a member still needs the link.
 
 `sync.library_at` is the most recent sweep across every media server. A sync that has never run reports `null`.
 
@@ -471,7 +499,8 @@ No auth. `{ "status": "ok", "version": "0.1.0" }`.
 
 ## Webhooks
 
-`?secret=` must match `general.webhook_secret`.
+Authenticate as a household member: basic authentication with a username and
+password, `Authorization: Bearer sngr_…`, or `?token=sngr_…`.
 
 | Endpoint | Sender | Effect |
 |----------|--------|--------|

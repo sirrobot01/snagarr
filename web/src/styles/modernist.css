@@ -1,4 +1,4 @@
-/* Modernist — the product system defined by tmp/mockups.
+/* Modernist — the product system defined.
    Paper, ink and signal red. Archivo throughout. Square geometry and visible
    dividers provide the hierarchy; elevation is reserved for overlays. */
 
@@ -285,18 +285,6 @@ select.input { cursor: pointer; }
   text-decoration: none;
 }
 .nav-brand:hover { color: var(--color-text); }
-.nav-logo-mark {
-  display: grid;
-  width: 34px;
-  height: 34px;
-  place-items: center;
-  border: 1px solid rgb(255 255 255 / 0.12);
-  border-radius: 11px;
-  background: linear-gradient(145deg, #7772ff, #4f46d8);
-  color: white;
-  box-shadow: 0 8px 22px rgb(79 70 229 / 0.28);
-}
-.nav-logo-mark svg { width: 18px; height: 18px; }
 .nav-links { display: flex; align-items: center; gap: 4px; }
 .nav-link {
   display: inline-flex;
@@ -467,7 +455,6 @@ select.input { cursor: pointer; }
   .nav-inner { min-height: 62px; }
   .nav-brand { margin-right: 0; }
   .nav-brand-label { display: none; }
-  .nav-logo-mark { width: 36px; height: 36px; }
   .nav-links { flex: 1; justify-content: center; }
   .nav-link { min-width: 42px; justify-content: center; padding-inline: 10px; }
   .nav-link-label { display: none; }
