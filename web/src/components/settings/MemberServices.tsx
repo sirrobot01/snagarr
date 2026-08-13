@@ -40,7 +40,9 @@ export function MemberServices({ user, onClose }: { user: HouseholdUser; onClose
               <tr key={service.id}>
                 <td className="font-heading font-extrabold">{kindLabel(service.kind)}</td>
                 <td className="text-muted">{service.name}</td>
-                <td className="text-muted break-all">{service.config.url ?? service.config.topic ?? '—'}</td>
+                <td className="text-muted break-all">
+                  {service.config.url || service.config.topic || '—'}
+                </td>
                 <td>
                   <span className={`sg-b ${configured(service) && service.enabled ? 'sg-lib' : 'sg-new'}`}>
                     {!service.enabled ? 'off' : configured(service) ? 'ready' : 'not set'}

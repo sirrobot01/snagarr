@@ -316,22 +316,21 @@
 
 /* ── Settings ───────────────────────────────────────────────────────────── */
 
+/* The hairlines between cards are this element's background showing through
+   the gaps. Wrapping flex rather than a grid, because the cards on a part
+   filled last row then grow to fill it — a grid would leave the bare divider
+   cells where the missing cards would have gone, and the card count is now
+   whatever the member has connected. */
 .sg-cards {
-  display: grid;
-  grid-template-columns: 1fr;
+  display: flex;
+  flex-wrap: wrap;
   gap: 2px;
   background: var(--color-divider);
   border-block: 2px solid var(--color-divider);
 }
-@media (min-width: 640px) {
-  .sg-cards {
-    grid-template-columns: repeat(2, 1fr);
-  }
-}
-@media (min-width: 900px) {
-  .sg-cards {
-    grid-template-columns: repeat(3, 1fr);
-  }
+.sg-cards > * {
+  flex: 1 1 260px;
+  min-width: 0;
 }
 
 .sg-card {

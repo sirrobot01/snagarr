@@ -1,10 +1,10 @@
-import type { ServiceConfig, ServiceKind } from '../../lib/types';
+import type { ArrKind, ServiceConfig } from '../../lib/types';
 import { SelectField, TextField } from './fields';
 import { useServiceOptions } from './service';
 
 interface Props {
   id: number;
-  kind: ServiceKind;
+  kind: ArrKind;
   config: ServiceConfig;
   locked: boolean;
   /** The lookup reads the stored credentials, so unsaved edits hold it back. */
