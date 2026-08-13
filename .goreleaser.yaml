@@ -89,7 +89,7 @@ dockers_v2:
     dockerfile: Dockerfile.release
     images:
       - ghcr.io/sirrobot01/snagarr
-      - docker.io/sirrobot01/snagarr
+      - docker.io/cy01/snagarr
     tags:
       - latest
       - "{{ .Version }}"
@@ -139,6 +139,6 @@ release:
     ## Docker images
 
     - `ghcr.io/sirrobot01/snagarr:{{ .Version }}`
-    - `docker.io/sirrobot01/snagarr:{{ .Version }}`
+    - `docker.io/cy01/snagarr:{{ .Version }}`
 
     Images are multi-arch (linux/amd64, linux/arm64) and signed with cosign.

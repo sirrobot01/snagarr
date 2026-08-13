@@ -59,10 +59,10 @@ docker run -d \
 
 ## Images
 
-| Registry | Image |
-|----------|-------|
+| Registry | Image                        |
+|----------|------------------------------|
 | GitHub | `ghcr.io/sirrobot01/snagarr` |
-| Docker Hub | `docker.io/sirrobot01/snagarr` |
+| Docker Hub | `docker.io/cy01/snagarr`     |
 
 | Tag | Example | Moves |
 |-----|---------|-------|
