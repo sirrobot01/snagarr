@@ -68,7 +68,6 @@ function GlobalCards({
   return (
     <>
       <Head title="Install settings" note="Shared by everybody in the household." />
-      {/* Two cards, so the three-column track would leave a bare divider cell. */}
       <div className="sg-cards">
         <GeneralCard settings={settings} draft={draft} />
         <TmdbCard settings={settings} draft={draft} />
