@@ -151,15 +151,6 @@ func (s *Store) RevokeToken(ctx context.Context, id int64) error {
 	return affected(res)
 }
 
-func (s *Store) TokenOwner(ctx context.Context, id int64) (int64, error) {
-	var userID int64
-	err := s.db.QueryRowContext(ctx, `SELECT user_id FROM tokens WHERE id = ?`, id).Scan(&userID)
-	if errors.Is(err, sql.ErrNoRows) {
-		return 0, ErrNotFound
-	}
-	return userID, err
-}
-
 // Tokens carry 160 bits of entropy, so a plain digest is enough — there is no
 // low-entropy secret here for a slow KDF to protect.
 func hashToken(secret string) string {

@@ -43,8 +43,8 @@ func (s *Server) Handler() http.Handler {
 		r.Get("/auth/status", s.authStatus)
 		r.Post("/auth/register", s.register)
 		r.Post("/auth/login", s.login)
-		// Webhook senders authenticate with a shared secret in the query
-		// string, because Radarr, Tautulli and Emby cannot all set headers.
+		// Webhook senders authenticate as a household member: basic auth,
+		// a bearer token, or ?token= for senders that cannot set headers.
 		r.Post("/webhooks/{service}", s.webhook)
 
 		r.Group(func(r chi.Router) {

@@ -42,8 +42,7 @@ func (s *Server) settingsBody(settings config.Settings) (map[string]any, error) 
 
 	configured := map[string]bool{
 		"tmdb": settings.TMDB.Configured(),
-		// General always works: the interval has a default and the webhook
-		// secret is generated on first run.
+		// General always works: every field in it has a usable default.
 		"general": true,
 	}
 	locked := map[string]bool{}
