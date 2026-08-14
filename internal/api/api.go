@@ -22,6 +22,9 @@ type Server struct {
 	reconciler *engine.Reconciler
 	web        http.Handler
 	log        *slog.Logger
+
+	logins        failureLimiter
+	webhookLogins failureLimiter
 }
 
 func New(st *store.Store, settings *config.Manager, res *engine.Resolver,

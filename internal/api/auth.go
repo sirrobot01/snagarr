@@ -47,6 +47,17 @@ func (s *Server) register(w http.ResponseWriter, r *http.Request) {
 		writeError(w, http.StatusBadRequest, codeBadRequest, "password is required")
 		return
 	}
+	// RegisterFirstAdmin re-checks inside its transaction; this early answer
+	// just keeps bcrypt work off an install that is already registered.
+	initialized, err := s.store.PasswordAuthInitialized(r.Context())
+	if err != nil {
+		s.writeStoreError(w, err, "account status")
+		return
+	}
+	if initialized {
+		writeError(w, http.StatusConflict, codeConflict, "this Snagarr installation is already registered")
+		return
+	}
 	hash, err := hashPassword(req.Password)
 	if err != nil {
 		s.log.Error("password hashing failed", "error", err)
@@ -81,8 +92,14 @@ func (s *Server) login(w http.ResponseWriter, r *http.Request) {
 	if !decode(w, r, &req) {
 		return
 	}
+	if s.logins.blocked() {
+		writeError(w, http.StatusTooManyRequests, codeRateLimited,
+			"too many failed sign-ins; try again in a few minutes")
+		return
+	}
 	u, err := s.store.UserByUsername(r.Context(), strings.TrimSpace(req.Username))
 	if err != nil || u.PasswordHash == "" || !passwordMatches(u.PasswordHash, req.Password) {
+		s.logins.recordFailure()
 		writeError(w, http.StatusUnauthorized, codeUnauthorized, "username or password is incorrect")
 		return
 	}
@@ -161,8 +178,15 @@ func (s *Server) webhookAuthorized(r *http.Request) bool {
 		return s.tokenAuthenticates(r, token)
 	}
 	if username, password, ok := r.BasicAuth(); ok {
+		if s.webhookLogins.blocked() {
+			return false
+		}
 		u, err := s.store.UserByUsername(r.Context(), strings.TrimSpace(username))
-		return err == nil && u.PasswordHash != "" && passwordMatches(u.PasswordHash, password)
+		if err == nil && u.PasswordHash != "" && passwordMatches(u.PasswordHash, password) {
+			return true
+		}
+		s.webhookLogins.recordFailure()
+		return false
 	}
 	// Emby sets no header of its own, so a token may travel in the query
 	// string. It is still a real token: owned by a member, and revocable.

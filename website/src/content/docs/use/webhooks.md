@@ -52,7 +52,7 @@ A webhook authenticates as a household member. There is no separate webhook secr
 
 Give the webhooks their own token. You then revoke that one token to stop them, and the member keeps their other clients. See [Tokens](/snagarr/start/first-run/#tokens).
 
-A revoked token, a wrong password and an unknown username all return `401`.
+A revoked token, a wrong password and an unknown username all return `401`. Ten failed username-and-password attempts in fifteen minutes pause password checks for webhooks; further attempts answer `401` until the window clears. Tokens are not limited.
 
 :::caution[Use HTTPS]
 Basic authentication and a bearer token both travel in clear text over HTTP. On a local network that is the same exposure as the old shared secret. Across the internet, put Snagarr behind TLS.

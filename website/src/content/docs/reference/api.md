@@ -81,12 +81,15 @@ A `member` may capture, read, build their own services, send to their own servic
 | 403 | `forbidden` |
 | 404 | `not_found` |
 | 409, 410 | `conflict` |
+| 429 | `rate_limited` |
 | 422 | `unresolvable` |
 | 500 | `internal_error` |
 | 502 | `upstream_error` |
 | 503 | `not_configured` |
 
 An unknown field in a request body is `400 bad_request`.
+
+Ten failed sign-ins in fifteen minutes pause `/auth/login`. Further attempts answer `429 rate_limited` until the window clears.
 
 ## Types
 

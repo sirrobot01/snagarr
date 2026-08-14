@@ -921,3 +921,67 @@ func TestDraftOptionsNeedNoRecord(t *testing.T) {
 		t.Errorf("looking options up created %d service(s), want none", len(services))
 	}
 }
+
+func TestLoginRateLimit(t *testing.T) {
+	ctx := context.Background()
+	h := newHarness(t)
+	hash, err := hashPassword("correct horse")
+	if err != nil {
+		t.Fatalf("hash: %v", err)
+	}
+	h.admin.PasswordHash = hash
+	if err := h.store.UpdateUser(ctx, h.admin); err != nil {
+		t.Fatalf("set password: %v", err)
+	}
+
+	login := func(password string) *http.Response {
+		return h.do(t, http.MethodPost, "/api/v1/auth/login", "",
+			map[string]string{"username": "Mukhtar", "password": password})
+	}
+	for i := 0; i < failureLimit; i++ {
+		if resp := login("wrong"); resp.StatusCode != http.StatusUnauthorized {
+			t.Fatalf("failure %d status = %d, want 401", i, resp.StatusCode)
+		}
+	}
+	if resp := login("correct horse"); resp.StatusCode != http.StatusTooManyRequests {
+		t.Errorf("after %d failures status = %d, want 429", failureLimit, resp.StatusCode)
+	}
+	// The webhook limiter is a separate one, so imports still authenticate.
+	resp := h.basic(t, "/api/v1/webhooks/radarr", "Mukhtar", "correct horse",
+		map[string]any{"eventType": "Test"})
+	if resp.StatusCode != http.StatusNoContent {
+		t.Errorf("webhook during login lockout status = %d, want 204", resp.StatusCode)
+	}
+}
+
+func TestWebhookRateLimit(t *testing.T) {
+	ctx := context.Background()
+	h := newHarness(t)
+	hash, err := hashPassword("correct horse")
+	if err != nil {
+		t.Fatalf("hash: %v", err)
+	}
+	h.admin.PasswordHash = hash
+	if err := h.store.UpdateUser(ctx, h.admin); err != nil {
+		t.Fatalf("set password: %v", err)
+	}
+
+	body := map[string]any{"eventType": "Test"}
+	for i := 0; i < failureLimit; i++ {
+		if resp := h.basic(t, "/api/v1/webhooks/radarr", "Mukhtar", "wrong", body); resp.StatusCode != http.StatusUnauthorized {
+			t.Fatalf("failure %d status = %d, want 401", i, resp.StatusCode)
+		}
+	}
+	if resp := h.basic(t, "/api/v1/webhooks/radarr", "Mukhtar", "correct horse", body); resp.StatusCode != http.StatusUnauthorized {
+		t.Errorf("during webhook lockout status = %d, want 401", resp.StatusCode)
+	}
+	// Tokens are not limited, and the sign-in limiter is untouched.
+	if resp := h.do(t, http.MethodPost, "/api/v1/webhooks/radarr", h.adminToken, body); resp.StatusCode != http.StatusNoContent {
+		t.Errorf("token webhook during lockout status = %d, want 204", resp.StatusCode)
+	}
+	resp := h.do(t, http.MethodPost, "/api/v1/auth/login", "",
+		map[string]string{"username": "Mukhtar", "password": "correct horse"})
+	if resp.StatusCode != http.StatusOK {
+		t.Errorf("login during webhook lockout status = %d, want 200", resp.StatusCode)
+	}
+}

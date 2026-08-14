@@ -17,6 +17,7 @@ const (
 	codeForbidden     = "forbidden"
 	codeNotFound      = "not_found"
 	codeConflict      = "conflict"
+	codeRateLimited   = "rate_limited"
 	codeUnresolvable  = "unresolvable"
 	codeUpstreamError = "upstream_error"
 	codeNotConfigured = "not_configured"
