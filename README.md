@@ -77,6 +77,7 @@ Every service card has a **Test connection** button.
 |---|---|
 | Web | The add box is the home page. It focuses on desktop load; touch devices open without forcing the keyboard. `/` refocuses it. |
 | Apple Shortcut | Import the published one, or build your own and share it as an iCloud link. |
+| CLI | `snagarr login https://snagarr.example.com`, then `snagarr snag "Sinners"`. |
 | Bookmarklet | Generated in Settings. Sends the current page. |
 | Anything | `POST /api/v1/capture` with a bearer token. |
 

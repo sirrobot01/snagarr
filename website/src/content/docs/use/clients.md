@@ -1,6 +1,6 @@
 ---
 title: Capture clients
-description: Every client posts to /api/v1/capture — the web app, the published Apple Shortcut, a bookmarklet or curl.
+description: Capture from the web app, the Snagarr CLI, the published Apple Shortcut, a bookmarklet or curl.
 ---
 
 Every client is a front-end over one endpoint: `POST /api/v1/capture`. Each one authenticates with its own bearer token. See [First run](/snagarr/start/first-run/#tokens) to issue one.
@@ -12,7 +12,7 @@ Every client is a front-end over one endpoint: `POST /api/v1/capture`. Each one 
 | Bookmarklet | Works from any origin | Desktop browser |
 | `curl` and scripts | Works | Anywhere |
 | Telegram bot | Dropped | — |
-| Command line | Not implemented | — |
+| Command line | Included in the `snagarr` binary | Linux, macOS, Windows, FreeBSD |
 
 ## The capture request
 
@@ -74,6 +74,45 @@ The client carries a web app manifest, so a phone can keep it beside the other a
 - **Android.** Open Snagarr in Chrome. Select the menu, then **Install app**.
 
 It opens without browser chrome and keeps the session it signed in with. This installs no software: it is the same web client behind an icon.
+
+## Command line
+
+The server binary is also a Cobra-based client. Sign in once with the same account used by the web app:
+
+```sh
+snagarr login https://snagarr.example.com
+Username: amina
+Password:
+✓  Logged in as @amina
+```
+
+The password is used only for the login request. The returned bearer token and server address are saved in the operating system's user configuration directory with user-only permissions.
+
+An existing capture token works too. Reading it from stdin keeps it out of shell history:
+
+```sh
+pbpaste | snagarr login https://snagarr.example.com --token-stdin
+```
+
+Capture a title, free text, or a URL:
+
+```sh
+snagarr snag "Sinners"
+snagarr snag "The Bear" --note "weekend"
+snagarr snag https://www.imdb.com/title/tt31193180/
+pbpaste | snagarr snag -
+```
+
+The default output is designed for a terminal. List and inspect the installation with:
+
+```sh
+snagarr list
+snagarr list --status needs_review
+snagarr list --archived
+snagarr status
+```
+
+Use `--json` on `snag`, `list`, or `status` for scripts. `SNAGARR_URL` and `SNAGARR_TOKEN` override the saved session, and the same values are available as `--server` and `--token` flags. Run `snagarr logout` to remove the saved token.
 
 ## Apple Shortcut
 

@@ -127,7 +127,11 @@ cosign verify-blob snagarr_0.1.0_checksums.txt \
 
 ```sh
 snagarr serve --addr :8080 --data /var/lib/snagarr
-snagarr version    # version, commit, build date
+snagarr version                                      # version, commit, build date
+snagarr login https://snagarr.example.com            # configure the CLI client
+snagarr snag "Sinners"                               # capture a title
+snagarr list                                          # read the shared list
+snagarr status                                        # inspect server state
 ```
 
 `serve` is the default command. `snagarr` alone does the same.
