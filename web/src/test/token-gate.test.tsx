@@ -142,3 +142,38 @@ describe('account gate', () => {
     expect(await screen.findByRole('heading', { name: /sign in to snagarr/i })).toBeInTheDocument();
   });
 });
+
+describe('rejected sessions', () => {
+  beforeEach(() => {
+    localStorage.clear();
+    history.replaceState(null, '', '/');
+  });
+
+  it('tracks a server-rejected session until the next sign-in', async () => {
+    const auth = await freshAuth();
+
+    auth.setToken('sngr_live');
+    auth.rejectToken();
+    expect(auth.getToken()).toBeNull();
+    expect(auth.wasRejected()).toBe(true);
+
+    auth.setToken('sngr_next');
+    expect(auth.wasRejected()).toBe(false);
+
+    auth.clearToken();
+    expect(auth.wasRejected()).toBe(false);
+  });
+
+  it('says why the user is looking at the sign-in screen', async () => {
+    mockFetch((url) => {
+      if (url.endsWith('/auth/status')) {
+        return { body: { initialized: true, setup_required: false } };
+      }
+      return { body: null };
+    });
+    const { TokenGate } = await import('../components/TokenGate');
+
+    render(<TokenGate rejected />);
+    expect(await screen.findByText(/session ended/i)).toBeInTheDocument();
+  });
+});

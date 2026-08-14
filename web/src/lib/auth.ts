@@ -53,17 +53,36 @@ export function initToken() {
   token = localStorage.getItem(STORAGE_KEY);
 }
 
+let rejected = false;
+
 export function getToken(): string | null {
   return token;
 }
 
+/** True when the server refused the stored session, as opposed to the user
+    signing out or never having signed in. */
+export function wasRejected(): boolean {
+  return rejected;
+}
+
 export function setToken(next: string) {
+  rejected = false;
   token = next.trim();
   localStorage.setItem(STORAGE_KEY, token);
   emit();
 }
 
 export function clearToken() {
+  rejected = false;
+  token = null;
+  localStorage.removeItem(STORAGE_KEY);
+  emit();
+}
+
+/** A 401 for a session the browser still holds: expired or revoked. The
+    sign-in screen uses the distinction to say why the user is looking at it. */
+export function rejectToken() {
+  rejected = rejected || token !== null;
   token = null;
   localStorage.removeItem(STORAGE_KEY);
   emit();

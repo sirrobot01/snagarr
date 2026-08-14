@@ -1,4 +1,4 @@
-import { clearToken, getToken } from './auth';
+import { getToken, rejectToken } from './auth';
 import type {
   CapturePayload,
   CreatedToken,
@@ -59,7 +59,7 @@ async function request<T>(path: string, init: RequestInit = {}): Promise<T> {
   }
 
   if (res.status === 401) {
-    clearToken();
+    rejectToken();
     throw new ApiError(401, 'unauthorized', 'token rejected');
   }
   if (res.status === 204) return undefined as T;

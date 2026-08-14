@@ -1,6 +1,6 @@
 import { useEffect, useState } from 'react';
 import { AlertCircle, Grid2X2, Inbox, List as ListIcon, LoaderCircle, RotateCw } from 'lucide-react';
-import { useSearch } from 'wouter';
+import { useLocation, useSearch } from 'wouter';
 
 import { DetailSheet } from '../components/DetailSheet';
 import { IndexTable } from '../components/IndexTable';
@@ -45,12 +45,16 @@ export default function List() {
   const status = useStatus();
 
   // /list?item=7 opens that item, which is how a search result reaches the
-  // detail it promised instead of dropping the reader on the list.
+  // detail it promised instead of dropping the reader on the list. The link is
+  // consumed on arrival so Back or a reload does not reopen the sheet.
   const query = useSearch();
+  const [, navigate] = useLocation();
   useEffect(() => {
     const asked = Number(new URLSearchParams(query).get('item'));
-    if (asked) setOpenId(asked);
-  }, [query]);
+    if (!asked) return;
+    setOpenId(asked);
+    navigate('/list', { replace: true });
+  }, [query, navigate]);
 
   const visible = (items.data?.items ?? []).filter((item) => matches(item, chip));
   const open = visible.find((item) => item.id === openId) ?? null;

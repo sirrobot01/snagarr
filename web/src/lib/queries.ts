@@ -5,6 +5,7 @@ import {
   type QueryClient,
 } from '@tanstack/react-query';
 import { ApiError, api } from './api';
+import { isUrl } from './format';
 import { pushToast } from './toast';
 import type {
   CreatedToken,
@@ -122,14 +123,20 @@ function markSearchRows(client: QueryClient, tmdbId: number, itemId: number | nu
   );
 }
 
+/* Both list caches carry the item's row: replacing it in the one whose filter
+   it still matches, dropping it from the one it left. Un-archiving from the
+   Archived view therefore clears that view at once, not on the refetch. */
 function replaceItem(client: QueryClient, id: number, next: Item | null) {
-  client.setQueryData<ItemsResponse>(keys.items(false), (prev) => {
-    if (!prev) return prev;
-    const items = next
-      ? prev.items.map((i) => (i.id === id ? next : i))
-      : prev.items.filter((i) => i.id !== id);
-    return { items, total: prev.total + (next ? 0 : -1) };
-  });
+  for (const archived of [false, true] as const) {
+    client.setQueryData<ItemsResponse>(keys.items(archived), (prev) => {
+      if (!prev || !prev.items.some((i) => i.id === id)) return prev;
+      const keep = next !== null && next.archived === archived;
+      const items = keep
+        ? prev.items.map((i) => (i.id === id ? next : i))
+        : prev.items.filter((i) => i.id !== id);
+      return { items, total: prev.total + (keep ? 0 : -1) };
+    });
+  }
 }
 
 function failed(action: string, error: unknown) {
@@ -206,14 +213,14 @@ function useItemMutation<V>(
   return useMutation({
     mutationFn: ({ item, value }: { item: Item; value: V }) => run(item, value),
     onMutate: async ({ item, value }) => {
-      await client.cancelQueries({ queryKey: keys.items(false) });
-      const previous = client.getQueryData<ItemsResponse>(keys.items(false));
+      await client.cancelQueries({ queryKey: ['items'] });
+      const previous = client.getQueriesData<ItemsResponse>({ queryKey: ['items'] });
       replaceItem(client, item.id, patch(item, value));
       client.setQueryData(keys.item(item.id), patch(item, value) ?? undefined);
       return { previous };
     },
     onError: (error, _vars, context) => {
-      if (context?.previous) client.setQueryData(keys.items(false), context.previous);
+      for (const [key, data] of context?.previous ?? []) client.setQueryData(key, data);
       failed(action, error);
     },
     onSettled: () => {
@@ -270,16 +277,24 @@ export function useResolve() {
   });
 }
 
+/** Free-form capture: a pasted link, or text the server should resolve on its
+    own. The server answers 202 with the raw capture and resolves it in the
+    background, so the toast promises resolution rather than a title. */
 export function useCaptureQuery() {
   const client = useQueryClient();
 
   return useMutation({
     mutationFn: (value: string) =>
-      api.capture(/^https?:\/\//i.test(value) ? { url: value, source: 'web' } : { query: value, source: 'web' }),
+      api.capture(isUrl(value) ? { url: value, source: 'web' } : { query: value, source: 'web' }),
     onError: (error) => failed('capture', error),
     onSuccess: (item) => {
-      pushToast(`Snagged — ${item.title}`);
+      pushToast(
+        item.status === 'needs_review'
+          ? 'Snagged — resolving in the background'
+          : `Snagged — ${item.title}`,
+      );
       void client.invalidateQueries({ queryKey: ['items'] });
+      void client.invalidateQueries({ queryKey: keys.status });
     },
   });
 }

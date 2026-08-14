@@ -1,5 +1,5 @@
 import { useEffect, useRef, useState, type KeyboardEvent } from 'react';
-import { AlertCircle, History, Keyboard, LoaderCircle, SearchX } from 'lucide-react';
+import { AlertCircle, History, Keyboard, Link2, LoaderCircle, SearchX } from 'lucide-react';
 import { useLocation } from 'wouter';
 
 import { CaptureBox } from '../components/CaptureBox';
@@ -8,10 +8,19 @@ import { ItemRow } from '../components/ItemRow';
 import { NeedsReview } from '../components/NeedsReview';
 import { ResultRow } from '../components/ResultRow';
 import { useDebounced } from '../hooks/useDebounced';
-import { useItems, useSearch, useSnag } from '../lib/queries';
+import { isUrl } from '../lib/format';
+import { useCaptureQuery, useItems, useSearch, useSnag } from '../lib/queries';
 import type { SearchResult } from '../lib/types';
 
 export const SEARCH_ID = 'sg-search';
+
+function hostOf(value: string): string {
+  try {
+    return new URL(value).host;
+  } catch {
+    return value;
+  }
+}
 
 export function Snag() {
   const [query, setQuery] = useState('');
@@ -20,16 +29,20 @@ export function Snag() {
   const input = useRef<HTMLInputElement>(null);
   const [, navigate] = useLocation();
 
-  const debounced = useDebounced(query.trim(), 250);
-  const search = useSearch(debounced);
+  const typed = query.trim();
+  // A pasted link is not a search: the server dereferences it, so the box
+  // switches from search results to a single capture action.
+  const link = isUrl(typed);
+  const debounced = useDebounced(typed, 250);
+  const search = useSearch(link ? '' : debounced);
   const items = useItems(false);
   const snag = useSnag();
+  const capture = useCaptureQuery();
 
   const results = search.data?.results ?? [];
-  const typed = query.trim();
   const idle = typed.length === 0;
   const short = typed.length < 2;
-  const busy = !short && (typed !== debounced || search.isFetching);
+  const busy = !short && !link && (typed !== debounced || search.isFetching);
 
   useEffect(() => setActive(0), [debounced]);
 
@@ -44,10 +57,22 @@ export function Snag() {
     snag.mutate({ result, query: typed });
   }
 
+  function snagLink() {
+    if (capture.isPending) return;
+    capture.mutate(typed, { onSuccess: () => setQuery('') });
+  }
+
   function onKeyDown(event: KeyboardEvent<HTMLInputElement>) {
     if (event.key === 'Escape') {
       setQuery('');
       input.current?.blur();
+      return;
+    }
+    if (link) {
+      if (event.key === 'Enter') {
+        event.preventDefault();
+        snagLink();
+      }
       return;
     }
     if (results.length === 0) return;
@@ -80,7 +105,33 @@ export function Snag() {
         onFocusChange={setFocused}
       />
 
-      {!idle && (
+      {!idle && link && (
+        <div className="sg-pad flex flex-col items-start gap-2 py-5">
+          <p className="m-0 flex items-center gap-2 font-heading font-extrabold">
+            <Link2 aria-hidden="true" size={16} /> Snag this link
+          </p>
+          <p className="text-muted m-0 text-[13px]">
+            {hostOf(typed)} — resolved in the background. Anything ambiguous lands in Needs
+            Review.
+          </p>
+          <button
+            type="button"
+            className="btn btn-secondary mt-1"
+            onClick={snagLink}
+            disabled={capture.isPending}
+          >
+            {capture.isPending && (
+              <LoaderCircle className="animate-spin" aria-hidden="true" size={15} />
+            )}
+            {capture.isPending ? 'Snagging…' : 'Snag link'}
+          </button>
+          <span className="sg-k hidden items-center gap-1.5 md:flex">
+            <Keyboard aria-hidden="true" size={14} /> Enter to snag
+          </span>
+        </div>
+      )}
+
+      {!idle && !link && (
         <>
           <div className="sg-pad flex items-center justify-between gap-3 border-b border-line py-[9px]">
             <span className="sg-k flex items-center gap-2" aria-live="polite">

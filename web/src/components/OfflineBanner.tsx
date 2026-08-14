@@ -1,4 +1,3 @@
-import { useIsMutating } from '@tanstack/react-query';
 import { LoaderCircle, WifiOff } from 'lucide-react';
 import { useSyncExternalStore } from 'react';
 
@@ -21,19 +20,18 @@ export function useOnline() {
 
 export function OfflineBanner({ unreachable }: { unreachable: boolean }) {
   const online = useOnline();
-  const inFlight = useIsMutating();
 
   if (online && !unreachable) return null;
 
+  // Nothing is queued while disconnected — a failed snag rolls back with its
+  // own toast — so the banner promises no more than what actually happens.
   return (
     <div className="sg-banner" role="status" aria-live="polite">
       <WifiOff aria-hidden="true" />
       <span>
-        {inFlight > 0
-          ? `${online ? 'Server unreachable' : 'Offline'} — ${inFlight} capture${inFlight === 1 ? '' : 's'} queued`
-          : online
-            ? 'Snagarr is temporarily unreachable'
-            : 'You’re offline'}
+        {online
+          ? 'Snagarr is temporarily unreachable — changes will not save'
+          : 'You’re offline — changes will not save'}
       </span>
       <span className="sg-banner-retry">
         <LoaderCircle aria-hidden="true" />

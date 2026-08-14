@@ -9,7 +9,7 @@ import { OfflineBanner } from './components/OfflineBanner';
 import { ToastHost } from './components/ToastHost';
 import { TokenGate } from './components/TokenGate';
 import { NetworkError } from './lib/api';
-import { getToken, subscribeToken } from './lib/auth';
+import { getToken, subscribeToken, wasRejected } from './lib/auth';
 import { relativeTime } from './lib/format';
 import { isAdmin, useMe, useStatus } from './lib/queries';
 import { SEARCH_ID, Snag } from './routes/Snag';
@@ -55,6 +55,10 @@ export function App() {
       const target = event.target as HTMLElement | null;
       if (target && /^(INPUT|TEXTAREA|SELECT)$/.test(target.tagName)) return;
       if (target?.isContentEditable) return;
+      // Focus inside an open sheet, dialog or popover stays there; navigating
+      // the page underneath it would just be a mis-typed shortcut.
+      if (target?.closest('[role="dialog"],[role="alertdialog"],[data-radix-popper-content-wrapper]'))
+        return;
 
       event.preventDefault();
       if (location !== '/') navigate('/');
@@ -64,7 +68,7 @@ export function App() {
     return () => window.removeEventListener('keydown', onKeyDown);
   }, [location, navigate]);
 
-  if (!token) return <TokenGate rejected={false} />;
+  if (!token) return <TokenGate rejected={wasRejected()} />;
 
   return <Shell />;
 }

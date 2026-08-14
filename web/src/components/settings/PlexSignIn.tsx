@@ -100,18 +100,28 @@ export function PlexSignIn({ onPicked }: { onPicked: (token: string) => void }) 
         setPhase({ step: 'failed', message: 'the sign-in code expired' });
         return;
       }
-      void api
-        .plexPinCheck(pinId)
-        .then(async (check) => {
+      void api.plexPinCheck(pinId).then(
+        async (check) => {
           if (!live || !check.token) return;
           window.clearInterval(timer);
-          const { servers } = await api.plexServers(check.token);
-          if (live) setPhase({ step: 'picking', token: check.token, servers });
-        })
-        .catch((error: unknown) => {
+          try {
+            const { servers } = await api.plexServers(check.token);
+            if (live) setPhase({ step: 'picking', token: check.token, servers });
+          } catch (error) {
+            if (live) setPhase({ step: 'failed', message: reason(error) });
+          }
+        },
+        (error: unknown) => {
+          // A dropped poll is not an answer: the code is still pending on
+          // plex.tv, so the wait continues until it expires. Only a definitive
+          // refusal ends the sign-in early.
+          const fatal =
+            error instanceof ApiError && (error.status === 401 || error.status === 404 || error.status === 410);
+          if (!fatal) return;
           window.clearInterval(timer);
           if (live) setPhase({ step: 'failed', message: reason(error) });
-        });
+        },
+      );
     }, POLL_MS);
 
     return () => {
