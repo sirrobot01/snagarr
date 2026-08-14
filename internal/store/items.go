@@ -215,8 +215,9 @@ func (s *Store) Items(ctx context.Context, f ItemFilter) ([]Item, int, error) {
 		args = append(args, f.CapturedBy)
 	}
 	if f.Query != "" {
-		where = append(where, "(i.title LIKE ? OR i.raw_input LIKE ?)")
-		like := "%" + f.Query + "%"
+		// % and _ in the user's text are letters to match, not wildcards.
+		where = append(where, `(i.title LIKE ? ESCAPE '\' OR i.raw_input LIKE ? ESCAPE '\')`)
+		like := "%" + strings.NewReplacer(`\`, `\\`, `%`, `\%`, `_`, `\_`).Replace(f.Query) + "%"
 		args = append(args, like, like)
 	}
 	clause := " WHERE " + strings.Join(where, " AND ")

@@ -307,11 +307,15 @@ func (e *Reconciler) syncLibraryService(ctx context.Context, lib integration.Lib
 	if full {
 		removed, err := e.store.TombstoneLibrary(ctx, lib.Service.ID, sweepStart)
 		if err != nil {
+			// Without the tombstone pass this sweep cannot vouch for deletions,
+			// so the stamp stays put and the next pass sweeps in full again.
 			e.log.Warn("library tombstone failed", "service", lib.Service.ID, "error", err)
-		} else if removed > 0 {
-			e.log.Info("library titles removed", "service", lib.Service.ID, "count", removed)
+		} else {
+			if removed > 0 {
+				e.log.Info("library titles removed", "service", lib.Service.ID, "count", removed)
+			}
+			last.FullSweepAt = time.Now().UTC()
 		}
-		last.FullSweepAt = time.Now().UTC()
 	}
 	last.SyncedAt = sweepStart
 

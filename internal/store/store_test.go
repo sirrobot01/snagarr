@@ -561,3 +561,44 @@ func TestResolveDuplicateTitleConflicts(t *testing.T) {
 		t.Errorf("duplicate create error = %v, want ErrConflict", err)
 	}
 }
+
+// % and _ in a search box are text the user typed, not LIKE wildcards.
+func TestItemsQueryTreatsWildcardsAsText(t *testing.T) {
+	ctx := context.Background()
+	s := newTestStore(t)
+
+	for _, title := range []string{"Sinners", "100% Wolf", "Snake_Eyes"} {
+		it := &Item{Title: title, RawInput: title, Status: StatusNeedsReview, Source: SourceWeb}
+		if err := s.CreateItem(ctx, it); err != nil {
+			t.Fatalf("seed %s: %v", title, err)
+		}
+	}
+
+	tests := []struct {
+		query string
+		want  []string
+	}{
+		{"%", []string{"100% Wolf"}},
+		{"_", []string{"Snake_Eyes"}},
+		{"sin", []string{"Sinners"}},
+	}
+	for _, tc := range tests {
+		items, total, err := s.Items(ctx, ItemFilter{Query: tc.query})
+		if err != nil {
+			t.Fatalf("query %q: %v", tc.query, err)
+		}
+		var got []string
+		for _, it := range items {
+			got = append(got, it.Title)
+		}
+		if total != len(tc.want) || len(got) != len(tc.want) {
+			t.Errorf("query %q matched %v, want %v", tc.query, got, tc.want)
+			continue
+		}
+		for i := range tc.want {
+			if got[i] != tc.want[i] {
+				t.Errorf("query %q matched %v, want %v", tc.query, got, tc.want)
+			}
+		}
+	}
+}
