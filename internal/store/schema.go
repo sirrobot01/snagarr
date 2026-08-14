@@ -175,4 +175,10 @@ CREATE INDEX http_cache_expiry ON http_cache(expires_at);
 ALTER TABLE library_index ADD COLUMN section_id TEXT NOT NULL DEFAULT '';
 DELETE FROM settings WHERE key = 'sync_state';
 `,
+	// Browser sessions expire when idle; deliberate tokens never do. Rows from
+	// earlier builds are recognised by the name the login handler gave them.
+	`
+ALTER TABLE tokens ADD COLUMN session INTEGER NOT NULL DEFAULT 0;
+UPDATE tokens SET session = 1 WHERE name = 'Browser session';
+`,
 }

@@ -86,7 +86,7 @@ func (s *Server) login(w http.ResponseWriter, r *http.Request) {
 		writeError(w, http.StatusUnauthorized, codeUnauthorized, "username or password is incorrect")
 		return
 	}
-	_, secret, err := s.store.CreateToken(r.Context(), u.ID, "Browser session")
+	_, secret, err := s.store.CreateToken(r.Context(), u.ID, "Browser session", true)
 	if err != nil {
 		s.writeStoreError(w, err, "session")
 		return

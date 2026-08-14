@@ -169,7 +169,7 @@ func (s *Server) listTokens(w http.ResponseWriter, r *http.Request) {
 	dtos := make([]map[string]any, 0, len(tokens))
 	for _, t := range tokens {
 		dtos = append(dtos, map[string]any{
-			"id": t.ID, "name": t.Name, "prefix": t.Prefix,
+			"id": t.ID, "name": t.Name, "prefix": t.Prefix, "session": t.Session,
 			"created_at": t.CreatedAt, "last_used_at": nullableTime(t.LastUsedAt),
 			"revoked": t.Revoked,
 		})
@@ -193,7 +193,7 @@ func (s *Server) createToken(w http.ResponseWriter, r *http.Request) {
 		req.Name = "New token"
 	}
 
-	token, secret, err := s.store.CreateToken(r.Context(), u.ID, req.Name)
+	token, secret, err := s.store.CreateToken(r.Context(), u.ID, req.Name, false)
 	if err != nil {
 		s.writeStoreError(w, err, "token")
 		return

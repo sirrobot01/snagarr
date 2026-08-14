@@ -58,7 +58,7 @@ func TestTokenAuthentication(t *testing.T) {
 	s := newTestStore(t)
 	u := newTestUser(t, s, "Mukhtar", RoleAdmin)
 
-	tok, secret, err := s.CreateToken(ctx, u.ID, "iPhone Shortcut")
+	tok, secret, err := s.CreateToken(ctx, u.ID, "iPhone Shortcut", false)
 	if err != nil {
 		t.Fatalf("create token: %v", err)
 	}
@@ -456,5 +456,77 @@ func TestCounts(t *testing.T) {
 	want := Counts{Total: 5, Ready: 2, Pending: 2, NeedsReview: 1, Archived: 1}
 	if got != want {
 		t.Errorf("counts = %+v, want %+v", got, want)
+	}
+}
+
+func TestSessionIdleExpiry(t *testing.T) {
+	ctx := context.Background()
+	s := newTestStore(t)
+	u := newTestUser(t, s, "Mukhtar", RoleAdmin)
+
+	_, session, err := s.CreateToken(ctx, u.ID, "Browser session", true)
+	if err != nil {
+		t.Fatalf("create session: %v", err)
+	}
+	_, keeper, err := s.CreateToken(ctx, u.ID, "iPhone Shortcut", false)
+	if err != nil {
+		t.Fatalf("create token: %v", err)
+	}
+
+	if _, err := s.Authenticate(ctx, session); err != nil {
+		t.Fatalf("fresh session: %v", err)
+	}
+
+	// Both tokens go idle for longer than the session window allows.
+	stale := time.Now().UTC().Add(-SessionIdleTTL - time.Hour)
+	if _, err := s.db.Exec(`UPDATE tokens SET last_used_at = ?`, stale); err != nil {
+		t.Fatalf("backdate: %v", err)
+	}
+
+	if _, err := s.Authenticate(ctx, session); err != ErrNotFound {
+		t.Errorf("idle session error = %v, want ErrNotFound", err)
+	}
+	if _, err := s.Authenticate(ctx, keeper); err != nil {
+		t.Errorf("deliberate token expired with the session: %v", err)
+	}
+}
+
+func TestPurgeExpiredSessions(t *testing.T) {
+	ctx := context.Background()
+	s := newTestStore(t)
+	u := newTestUser(t, s, "Mukhtar", RoleAdmin)
+
+	for _, tok := range []struct {
+		name    string
+		session bool
+	}{
+		{"Browser session", true},
+		{"Browser session", true},
+		{"iPhone Shortcut", false},
+	} {
+		if _, _, err := s.CreateToken(ctx, u.ID, tok.name, tok.session); err != nil {
+			t.Fatalf("create %s: %v", tok.name, err)
+		}
+	}
+
+	// Nothing is idle yet, so nothing goes.
+	if n, err := s.PurgeExpiredSessions(ctx); err != nil || n != 0 {
+		t.Fatalf("early purge = %d, %v; want 0, nil", n, err)
+	}
+
+	stale := time.Now().UTC().Add(-SessionIdleTTL - time.Hour)
+	if _, err := s.db.Exec(`UPDATE tokens SET last_used_at = ?`, stale); err != nil {
+		t.Fatalf("backdate: %v", err)
+	}
+
+	if n, err := s.PurgeExpiredSessions(ctx); err != nil || n != 2 {
+		t.Fatalf("purge = %d, %v; want 2, nil", n, err)
+	}
+	tokens, err := s.Tokens(ctx, u.ID)
+	if err != nil {
+		t.Fatalf("list tokens: %v", err)
+	}
+	if len(tokens) != 1 || tokens[0].Name != "iPhone Shortcut" || tokens[0].Session {
+		t.Errorf("survivors = %+v, want only the deliberate token", tokens)
 	}
 }

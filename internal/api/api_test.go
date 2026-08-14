@@ -53,7 +53,7 @@ func newHarness(t *testing.T) *harness {
 	if err := db.CreateUser(ctx, h.admin); err != nil {
 		t.Fatalf("create admin: %v", err)
 	}
-	if _, h.adminToken, err = db.CreateToken(ctx, h.admin.ID, "admin"); err != nil {
+	if _, h.adminToken, err = db.CreateToken(ctx, h.admin.ID, "admin", false); err != nil {
 		t.Fatalf("admin token: %v", err)
 	}
 
@@ -61,7 +61,7 @@ func newHarness(t *testing.T) *harness {
 	if err := db.CreateUser(ctx, h.member); err != nil {
 		t.Fatalf("create member: %v", err)
 	}
-	if _, h.memberToken, err = db.CreateToken(ctx, h.member.ID, "member"); err != nil {
+	if _, h.memberToken, err = db.CreateToken(ctx, h.member.ID, "member", false); err != nil {
 		t.Fatalf("member token: %v", err)
 	}
 	return h

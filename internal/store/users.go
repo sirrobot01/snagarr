@@ -117,7 +117,7 @@ func (s *Store) RegisterFirstAdmin(ctx context.Context, u *User) (string, error)
 		return "", err
 	}
 	if _, err := tx.ExecContext(ctx,
-		`INSERT INTO tokens (user_id, name, token_hash, prefix, created_at) VALUES (?, ?, ?, ?, ?)`,
+		`INSERT INTO tokens (user_id, name, token_hash, prefix, session, created_at) VALUES (?, ?, ?, ?, 1, ?)`,
 		u.ID, "Browser session", hashToken(secret), secret[:len(TokenPrefix)+4], u.CreatedAt); err != nil {
 		return "", fmt.Errorf("create registration session: %w", err)
 	}

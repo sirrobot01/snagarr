@@ -176,6 +176,11 @@ func (e *Reconciler) Run(ctx context.Context) error {
 	if err := e.store.PurgeExpiredCache(ctx); err != nil {
 		e.log.Warn("could not purge response cache", "error", err)
 	}
+	if n, err := e.store.PurgeExpiredSessions(ctx); err != nil {
+		e.log.Warn("could not purge expired sessions", "error", err)
+	} else if n > 0 {
+		e.log.Info("idle browser sessions removed", "count", n)
+	}
 	e.persistState(ctx)
 
 	e.log.Info("reconcile complete", "took", time.Since(started).Round(time.Millisecond), "became_available", available)

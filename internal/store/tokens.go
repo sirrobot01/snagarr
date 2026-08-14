@@ -17,6 +17,14 @@ import (
 // scanners.
 const TokenPrefix = "sngr_"
 
+// SessionIdleTTL is how long a browser session may sit unused before it stops
+// authenticating. Authenticate stamps last_used_at on every request, so the
+// window slides: a device in any regular use never sees a login screen again,
+// and only abandoned or leaked sessions age out. Deliberate tokens — CLI,
+// Shortcut, bookmarklet, webhooks — never expire; a client that cannot
+// re-authenticate itself must not die quietly.
+const SessionIdleTTL = 90 * 24 * time.Hour
+
 // Token is the metadata of an issued token. The secret itself is never stored,
 // only its SHA-256 digest.
 type Token struct {
@@ -24,6 +32,7 @@ type Token struct {
 	UserID     int64
 	Name       string
 	Prefix     string
+	Session    bool
 	CreatedAt  time.Time
 	LastUsedAt time.Time
 	Revoked    bool
@@ -31,7 +40,8 @@ type Token struct {
 
 // CreateToken issues a token for a user and returns it alongside the raw
 // secret. The secret is readable exactly once — it cannot be recovered later.
-func (s *Store) CreateToken(ctx context.Context, userID int64, name string) (*Token, string, error) {
+// session marks a browser login, which expires after SessionIdleTTL idle.
+func (s *Store) CreateToken(ctx context.Context, userID int64, name string, session bool) (*Token, string, error) {
 	secret, err := newTokenSecret()
 	if err != nil {
 		return nil, "", err
@@ -41,11 +51,12 @@ func (s *Store) CreateToken(ctx context.Context, userID int64, name string) (*To
 		UserID:    userID,
 		Name:      name,
 		Prefix:    secret[:len(TokenPrefix)+4],
+		Session:   session,
 		CreatedAt: time.Now().UTC(),
 	}
 	res, err := s.db.ExecContext(ctx,
-		`INSERT INTO tokens (user_id, name, token_hash, prefix, created_at) VALUES (?, ?, ?, ?, ?)`,
-		t.UserID, t.Name, hashToken(secret), t.Prefix, t.CreatedAt)
+		`INSERT INTO tokens (user_id, name, token_hash, prefix, session, created_at) VALUES (?, ?, ?, ?, ?, ?)`,
+		t.UserID, t.Name, hashToken(secret), t.Prefix, t.Session, t.CreatedAt)
 	if err != nil {
 		return nil, "", fmt.Errorf("create token: %w", err)
 	}
@@ -64,17 +75,30 @@ func newTokenSecret() (string, error) {
 }
 
 // Authenticate resolves a raw token to its owner and stamps the token as used.
-// An unknown or revoked token returns ErrNotFound.
+// An unknown, revoked or idle-expired token returns ErrNotFound.
 func (s *Store) Authenticate(ctx context.Context, secret string) (*User, error) {
 	var tokenID, userID int64
+	var session bool
+	var lastUsed sql.NullTime
+	var created time.Time
 	err := s.db.QueryRowContext(ctx,
-		`SELECT id, user_id FROM tokens WHERE token_hash = ? AND revoked = 0`, hashToken(secret)).
-		Scan(&tokenID, &userID)
+		`SELECT id, user_id, session, last_used_at, created_at FROM tokens
+		 WHERE token_hash = ? AND revoked = 0`, hashToken(secret)).
+		Scan(&tokenID, &userID, &session, &lastUsed, &created)
 	if errors.Is(err, sql.ErrNoRows) {
 		return nil, ErrNotFound
 	}
 	if err != nil {
 		return nil, fmt.Errorf("authenticate: %w", err)
+	}
+	if session {
+		idleSince := created
+		if lastUsed.Valid {
+			idleSince = lastUsed.Time
+		}
+		if time.Since(idleSince) > SessionIdleTTL {
+			return nil, ErrNotFound
+		}
 	}
 	if _, err := s.db.ExecContext(ctx,
 		`UPDATE tokens SET last_used_at = ? WHERE id = ?`, time.Now().UTC(), tokenID); err != nil {
@@ -83,9 +107,22 @@ func (s *Store) Authenticate(ctx context.Context, secret string) (*User, error) 
 	return s.User(ctx, userID)
 }
 
+// PurgeExpiredSessions deletes browser sessions past their idle cutoff, so the
+// tokens table does not grow one dead row per login forever. Deliberate tokens
+// are never touched; revoked sessions age out the same way once idle.
+func (s *Store) PurgeExpiredSessions(ctx context.Context) (int64, error) {
+	res, err := s.db.ExecContext(ctx,
+		`DELETE FROM tokens WHERE session = 1 AND COALESCE(last_used_at, created_at) < ?`,
+		time.Now().UTC().Add(-SessionIdleTTL))
+	if err != nil {
+		return 0, fmt.Errorf("purge sessions: %w", err)
+	}
+	return res.RowsAffected()
+}
+
 func (s *Store) Tokens(ctx context.Context, userID int64) ([]Token, error) {
 	rows, err := s.db.QueryContext(ctx,
-		`SELECT id, user_id, name, prefix, created_at, last_used_at, revoked
+		`SELECT id, user_id, name, prefix, session, created_at, last_used_at, revoked
 		 FROM tokens WHERE user_id = ? ORDER BY id`, userID)
 	if err != nil {
 		return nil, fmt.Errorf("list tokens: %w", err)
@@ -96,7 +133,7 @@ func (s *Store) Tokens(ctx context.Context, userID int64) ([]Token, error) {
 	for rows.Next() {
 		var t Token
 		var lastUsed sql.NullTime
-		if err := rows.Scan(&t.ID, &t.UserID, &t.Name, &t.Prefix, &t.CreatedAt, &lastUsed, &t.Revoked); err != nil {
+		if err := rows.Scan(&t.ID, &t.UserID, &t.Name, &t.Prefix, &t.Session, &t.CreatedAt, &lastUsed, &t.Revoked); err != nil {
 			return nil, fmt.Errorf("list tokens: %w", err)
 		}
 		t.LastUsedAt = lastUsed.Time
