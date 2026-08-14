@@ -101,7 +101,7 @@ Sonarr must send `series.tmdbId`. Older versions send only `series.tvdbId`; Snag
 Check both parameter names against the list Tautulli shows under the JSON Data field. They change between versions.
 
 :::caution
-Snagarr reads no event name from a playback payload. Any payload it can match marks the title watched. Do not turn on **Playback Start**.
+The template above carries no event name, so any payload Snagarr can match marks the title watched. Turn on **Watched** only. Snagarr ignores a payload that names a start, pause, resume or progress event, but that backstop only works when the payload carries the event name.
 :::
 
 ## Emby
@@ -160,8 +160,11 @@ Snagarr acts on four event types and ignores the rest: `Download` · `MovieFileI
 | `Item.ProviderIds.Tmdb` | Emby, Jellyfin | Title identity, if `tmdb_id` is absent |
 | `media_type` | Tautulli, Jellyfin template | Media type |
 | `Item.Type` | Emby, Jellyfin | Media type, if `media_type` is absent |
+| `event`, `action`, `NotificationType` | Emby, Jellyfin plugin, and any sender that names its events | The event filter |
 
-Under `Item.ProviderIds`, Snagarr accepts the keys `Tmdb`, `tmdb` and `TMDB`. The title is a series when `media_type` is `show` or `episode`, or when `Item.Type` is `Episode` or `Series`. Otherwise it is a movie. Snagarr reads neither the `event` field nor the `action` field.
+Under `Item.ProviderIds`, Snagarr accepts the keys `Tmdb`, `tmdb` and `TMDB`. The title is a series when `media_type` is `show` or `episode`, or when `Item.Type` is `Episode` or `Series`. Otherwise it is a movie.
+
+Snagarr ignores a payload whose `event`, `action` or `NotificationType` names a start, pause, resume or progress event, in any sender's spelling (`playback.start`, `PlaybackStart`, `media.play`, `pause`). Any other event name, or no event name at all, counts as a watch.
 
 ## What each webhook changes
 

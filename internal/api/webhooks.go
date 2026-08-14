@@ -5,6 +5,7 @@ import (
 	"io"
 	"net/http"
 	"strconv"
+	"strings"
 
 	"github.com/go-chi/chi/v5"
 
@@ -81,8 +82,9 @@ func (s *Server) handleImport(r *http.Request, service string, body []byte) {
 // playbackEvent spans Tautulli, Emby and Jellyfin. None of them agree on field
 // names, so every known spelling is accepted and the first non-empty one wins.
 type playbackEvent struct {
-	Event  string `json:"event"`
-	Action string `json:"action"`
+	Event            string `json:"event"`
+	Action           string `json:"action"`
+	NotificationType string `json:"NotificationType"`
 
 	MediaType string `json:"media_type"`
 	TMDBID    string `json:"tmdb_id"`
@@ -93,10 +95,45 @@ type playbackEvent struct {
 	} `json:"Item"`
 }
 
+// inProgressEvents are the playback notifications that must never count as a
+// watch: starting, pausing, resuming or progressing through a title. Senders
+// name them differently (Emby "playback.start", the Jellyfin plugin
+// "PlaybackStart", Plex "media.play"), so names are compared with everything
+// but letters stripped. Stop and watched events pass, and so does a payload
+// with no event name at all — the documented Tautulli and Jellyfin templates
+// carry none.
+var inProgressEvents = map[string]bool{
+	"play": true, "mediaplay": true, "start": true, "playbackstart": true,
+	"pause": true, "mediapause": true, "playbackpause": true,
+	"unpause": true, "playbackunpause": true,
+	"resume": true, "mediaresume": true, "playbackresume": true,
+	"progress": true, "playbackprogress": true,
+}
+
+func isInProgress(names ...string) bool {
+	for _, name := range names {
+		var b strings.Builder
+		for _, r := range strings.ToLower(name) {
+			if r >= 'a' && r <= 'z' {
+				b.WriteRune(r)
+			}
+		}
+		if inProgressEvents[b.String()] {
+			return true
+		}
+	}
+	return false
+}
+
 func (s *Server) handlePlayback(r *http.Request, service string, body []byte) {
 	var event playbackEvent
 	if err := json.Unmarshal(body, &event); err != nil {
 		s.log.Warn("could not read webhook payload", "service", service, "error", err)
+		return
+	}
+	if isInProgress(event.Event, event.Action, event.NotificationType) {
+		s.log.Debug("ignored in-progress playback event", "service", service,
+			"event", event.Event+event.Action+event.NotificationType)
 		return
 	}
 

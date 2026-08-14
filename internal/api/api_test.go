@@ -985,3 +985,113 @@ func TestWebhookRateLimit(t *testing.T) {
 		t.Errorf("login during webhook lockout status = %d, want 200", resp.StatusCode)
 	}
 }
+
+// A playback webhook that names a start, pause, resume or progress event must
+// not mark the title watched — pressing play is the opposite of finishing.
+func TestPlaybackWebhookFiltersInProgressEvents(t *testing.T) {
+	ctx := context.Background()
+	h := newHarness(t)
+	it := &store.Item{Title: "Sinners", RawInput: "sinners", Status: store.StatusAvailable,
+		Source: store.SourceWeb, TMDBID: 1233413, MediaType: store.Movie}
+	if err := h.store.CreateItem(ctx, it); err != nil {
+		t.Fatalf("seed item: %v", err)
+	}
+
+	status := func() store.Status {
+		t.Helper()
+		got, err := h.store.Item(ctx, it.ID)
+		if err != nil {
+			t.Fatalf("read item: %v", err)
+		}
+		return got.Status
+	}
+
+	for _, event := range []map[string]any{
+		{"event": "media.play"},
+		{"event": "playback.start"},
+		{"action": "pause"},
+		{"NotificationType": "PlaybackProgress"},
+		{"NotificationType": "PlaybackStart"},
+	} {
+		event["tmdb_id"] = "1233413"
+		event["media_type"] = "movie"
+		resp := h.do(t, http.MethodPost, "/api/v1/webhooks/tautulli", h.adminToken, event)
+		if resp.StatusCode != http.StatusNoContent {
+			t.Fatalf("webhook status = %d, want 204", resp.StatusCode)
+		}
+		if got := status(); got != store.StatusAvailable {
+			t.Fatalf("after %v item status = %s, want still available", event, got)
+		}
+	}
+
+	// A stop event is a watch.
+	resp := h.do(t, http.MethodPost, "/api/v1/webhooks/emby", h.adminToken, map[string]any{
+		"event": "playback.stop",
+		"Item":  map[string]any{"Type": "Movie", "ProviderIds": map[string]string{"Tmdb": "1233413"}},
+	})
+	if resp.StatusCode != http.StatusNoContent {
+		t.Fatalf("stop webhook status = %d, want 204", resp.StatusCode)
+	}
+	if got := status(); got != store.StatusWatched {
+		t.Errorf("after stop item status = %s, want watched", got)
+	}
+}
+
+// The documented Tautulli and Jellyfin templates carry no event name at all,
+// so an eventless payload must keep marking the title watched.
+func TestPlaybackWebhookAcceptsEventlessPayload(t *testing.T) {
+	ctx := context.Background()
+	h := newHarness(t)
+	it := &store.Item{Title: "Sinners", RawInput: "sinners", Status: store.StatusAvailable,
+		Source: store.SourceWeb, TMDBID: 1233413, MediaType: store.Movie}
+	if err := h.store.CreateItem(ctx, it); err != nil {
+		t.Fatalf("seed item: %v", err)
+	}
+
+	resp := h.do(t, http.MethodPost, "/api/v1/webhooks/tautulli", h.adminToken,
+		map[string]any{"tmdb_id": "1233413", "media_type": "movie"})
+	if resp.StatusCode != http.StatusNoContent {
+		t.Fatalf("webhook status = %d, want 204", resp.StatusCode)
+	}
+	got, err := h.store.Item(ctx, it.ID)
+	if err != nil {
+		t.Fatalf("read item: %v", err)
+	}
+	if got.Status != store.StatusWatched {
+		t.Errorf("item status = %s, want watched", got.Status)
+	}
+}
+
+// Import webhooks act on the four import event types and nothing else.
+func TestImportWebhookFiltersEventTypes(t *testing.T) {
+	ctx := context.Background()
+	h := newHarness(t)
+	it := &store.Item{Title: "Sinners", RawInput: "sinners", Status: store.StatusMonitored,
+		Source: store.SourceWeb, TMDBID: 1233413, MediaType: store.Movie}
+	if err := h.store.CreateItem(ctx, it); err != nil {
+		t.Fatalf("seed item: %v", err)
+	}
+
+	body := map[string]any{"eventType": "Grab", "movie": map[string]any{"tmdbId": 1233413}}
+	if resp := h.do(t, http.MethodPost, "/api/v1/webhooks/radarr", h.adminToken, body); resp.StatusCode != http.StatusNoContent {
+		t.Fatalf("grab webhook status = %d, want 204", resp.StatusCode)
+	}
+	got, err := h.store.Item(ctx, it.ID)
+	if err != nil {
+		t.Fatalf("read item: %v", err)
+	}
+	if got.Status != store.StatusMonitored {
+		t.Fatalf("after Grab status = %s, want still monitored", got.Status)
+	}
+
+	body["eventType"] = "Download"
+	if resp := h.do(t, http.MethodPost, "/api/v1/webhooks/radarr", h.adminToken, body); resp.StatusCode != http.StatusNoContent {
+		t.Fatalf("download webhook status = %d, want 204", resp.StatusCode)
+	}
+	if got, err = h.store.Item(ctx, it.ID); err != nil {
+		t.Fatalf("read item: %v", err)
+	}
+	if got.Status != store.StatusAvailable {
+		t.Errorf("after Download status = %s, want available", got.Status)
+	}
+}
