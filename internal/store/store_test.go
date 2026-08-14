@@ -3,6 +3,7 @@ package store
 import (
 	"bytes"
 	"context"
+	"errors"
 	"path/filepath"
 	"testing"
 	"time"
@@ -528,5 +529,35 @@ func TestPurgeExpiredSessions(t *testing.T) {
 	}
 	if len(tokens) != 1 || tokens[0].Name != "iPhone Shortcut" || tokens[0].Session {
 		t.Errorf("survivors = %+v, want only the deliberate token", tokens)
+	}
+}
+
+// The unique index on (tmdb_id, media_type) arbitrates concurrent captures of
+// one title: the second resolution must surface ErrConflict, not a raw
+// constraint error, so the resolver can take its duplicate path.
+func TestResolveDuplicateTitleConflicts(t *testing.T) {
+	ctx := context.Background()
+	s := newTestStore(t)
+
+	first := &Item{Title: "Sinners", RawInput: "sinners", Status: StatusNew,
+		Source: SourceWeb, TMDBID: 1233413, MediaType: Movie}
+	if err := s.CreateItem(ctx, first); err != nil {
+		t.Fatalf("seed first: %v", err)
+	}
+	second := &Item{Title: "sinners movie", RawInput: "sinners movie",
+		Status: StatusNeedsReview, Source: SourceWeb}
+	if err := s.CreateItem(ctx, second); err != nil {
+		t.Fatalf("seed second: %v", err)
+	}
+
+	err := s.Resolve(ctx, second.ID, Candidate{TMDBID: 1233413, MediaType: Movie, Title: "Sinners"})
+	if !errors.Is(err, ErrConflict) {
+		t.Errorf("duplicate resolve error = %v, want ErrConflict", err)
+	}
+
+	dup := &Item{Title: "Sinners", RawInput: "sinners again", Status: StatusNew,
+		Source: SourceWeb, TMDBID: 1233413, MediaType: Movie}
+	if err := s.CreateItem(ctx, dup); !errors.Is(err, ErrConflict) {
+		t.Errorf("duplicate create error = %v, want ErrConflict", err)
 	}
 }

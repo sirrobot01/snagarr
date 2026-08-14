@@ -117,18 +117,16 @@ func (r *Resolver) resolveByID(ctx context.Context, client *integration.TMDBClie
 }
 
 // commit resolves the item, but yields to an existing item for the same title
-// so the list never grows a duplicate.
+// so the list never grows a duplicate. The store's unique index arbitrates, so
+// two concurrent captures of one title cannot both get through: the loser sees
+// ErrConflict and is deleted the same way a sequential duplicate would be.
 func (r *Resolver) commit(ctx context.Context, client *integration.TMDBClient, it *store.Item, c store.Candidate) error {
-	existing, err := r.store.ItemByTMDB(ctx, c.TMDBID, c.MediaType)
-	if err == nil && existing.ID != it.ID {
-		r.log.Info("capture matched an existing item", "item", it.ID, "existing", existing.ID, "title", c.Title)
+	err := r.store.Resolve(ctx, it.ID, c)
+	if errors.Is(err, store.ErrConflict) {
+		r.log.Info("capture matched an existing item", "item", it.ID, "title", c.Title)
 		return r.store.DeleteItem(ctx, it.ID)
 	}
-	if err != nil && !errors.Is(err, store.ErrNotFound) {
-		return err
-	}
-
-	if err := r.store.Resolve(ctx, it.ID, c); err != nil {
+	if err != nil {
 		return err
 	}
 	if err := r.store.SetCandidates(ctx, it.ID, nil); err != nil {

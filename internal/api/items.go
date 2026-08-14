@@ -61,19 +61,20 @@ func (s *Server) capture(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
+	// Read it back so the response carries the capturer's name, which only the
+	// join supplies — and before resolution starts, so a duplicate capture the
+	// resolver deletes cannot 404 its own 202.
+	saved, err := s.store.Item(r.Context(), it.ID)
+	if err != nil {
+		s.writeStoreError(w, err, "item")
+		return
+	}
+
 	// Resolution outlives the request: the capture is already safe on disk.
 	// Without a TMDB key there is nothing to resolve against, and the item is
 	// already parked in needs_review, so it waits for the key instead.
 	if catalogue := s.tmdb(); catalogue != nil {
 		go s.resolveInBackground(context.WithoutCancel(r.Context()), catalogue, it.ID)
-	}
-
-	// Read it back so the response carries the capturer's name, which only the
-	// join supplies.
-	saved, err := s.store.Item(r.Context(), it.ID)
-	if err != nil {
-		s.writeStoreError(w, err, "item")
-		return
 	}
 	writeJSON(w, http.StatusAccepted, newItemDTO(*saved))
 }
@@ -115,6 +116,14 @@ func (s *Server) captureKnownTitle(w http.ResponseWriter, r *http.Request, req c
 		CapturedBy: userFrom(r).ID, ResolvedAt: time.Now().UTC(),
 	}
 	if err := s.store.CreateItem(ctx, it); err != nil {
+		// A concurrent capture of the same title won the unique index; answer
+		// with the item it created, the same as the idempotency check above.
+		if errors.Is(err, store.ErrConflict) {
+			if existing, lookupErr := s.store.ItemByTMDB(ctx, req.TMDBID, req.MediaType); lookupErr == nil {
+				writeJSON(w, http.StatusOK, newItemDTO(*existing))
+				return
+			}
+		}
 		s.writeStoreError(w, err, "item")
 		return
 	}

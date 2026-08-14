@@ -8,7 +8,18 @@ import (
 	"fmt"
 	"strings"
 	"time"
+
+	sqlite "modernc.org/sqlite"
+	sqlite3 "modernc.org/sqlite/lib"
 )
+
+// isDuplicateTitle recognises the unique index on (tmdb_id, media_type)
+// firing, which is how a concurrent write to the same title loses the race.
+func isDuplicateTitle(err error) bool {
+	var se *sqlite.Error
+	return errors.As(err, &se) &&
+		(se.Code() == sqlite3.SQLITE_CONSTRAINT_UNIQUE || se.Code() == sqlite3.SQLITE_CONSTRAINT_PRIMARYKEY)
+}
 
 // Status is an item's composite state. Everything except needs_review is
 // derived by the reconcile loop from the local library and *arr indexes.
@@ -104,6 +115,9 @@ func (s *Store) CreateItem(ctx context.Context, it *Item) error {
 		nullInt(it.TMDBID), it.MediaType, it.Title, nullInt(int64(it.Year)), nullStr(it.PosterPath),
 		it.Status, it.RawInput, it.Source, nullStr(it.SourceURL), nullStr(it.Note),
 		nullInt(it.CapturedBy), it.CapturedAt, nullTime(it.ResolvedAt), nullTime(it.AvailableAt))
+	if isDuplicateTitle(err) {
+		return ErrConflict
+	}
 	if err != nil {
 		return fmt.Errorf("create item: %w", err)
 	}
@@ -256,7 +270,9 @@ func (s *Store) SnaggedItems(ctx context.Context) ([]Item, error) {
 }
 
 // Resolve points an item at a TMDB entry, which is also how a needs_review item
-// leaves the queue.
+// leaves the queue. Resolving to a title another item already holds returns
+// ErrConflict; the unique index is the authority, so there is no window for
+// two captures of the same title to both get through.
 func (s *Store) Resolve(ctx context.Context, id int64, c Candidate) error {
 	res, err := s.db.ExecContext(ctx,
 		`UPDATE items SET tmdb_id = ?, media_type = ?, title = ?, year = ?, poster_path = ?,
@@ -264,6 +280,9 @@ func (s *Store) Resolve(ctx context.Context, id int64, c Candidate) error {
 		 WHERE id = ?`,
 		c.TMDBID, c.MediaType, c.Title, nullInt(int64(c.Year)), nullStr(c.PosterPath),
 		StatusNeedsReview, StatusNew, time.Now().UTC(), id)
+	if isDuplicateTitle(err) {
+		return ErrConflict
+	}
 	if err != nil {
 		return fmt.Errorf("resolve item: %w", err)
 	}
