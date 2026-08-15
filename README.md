@@ -20,6 +20,24 @@ file lands.
 It is the capture and recall layer for an existing \*arr stack. It feeds
 Overseerr, Radarr and Sonarr rather than replacing them.
 
+<img src="website/public/screenshots/desktop/home.png" alt="The Snag screen: the search box focused, with recently snagged titles and their state badges" width="100%">
+
+<details>
+<summary><strong>More screenshots</strong> — the list, settings, and the mobile layout</summary>
+<br>
+
+<img src="website/public/screenshots/desktop/list.png" alt="The List screen: filter chips over a poster grid, each poster carrying its state badge" width="100%">
+
+<img src="website/public/screenshots/desktop/settings.png" alt="Settings: each member connects their own services, with household settings below" width="100%">
+
+<p>
+<img src="website/public/screenshots/mobile/home.png" alt="The Snag screen on a phone" width="32%">
+<img src="website/public/screenshots/mobile/list.png" alt="The List screen on a phone" width="32%">
+<img src="website/public/screenshots/mobile/settings.png" alt="Settings on a phone" width="32%">
+</p>
+
+</details>
+
 ## Design
 
 | | |
