@@ -57,6 +57,15 @@ func (s TMDBSettings) Key() string {
 	return DefaultTMDBKey
 }
 
+// TelegramSettings holds the household's bot. One bot serves the install; who
+// may use it is the user table's telegram IDs, not a setting.
+type TelegramSettings struct {
+	BotToken string `json:"bot_token"`
+}
+
+// Configured reports whether the bot can poll.
+func (s TelegramSettings) Configured() bool { return s.BotToken != "" }
+
 // GeneralSettings are the install-wide knobs.
 type GeneralSettings struct {
 	ReconcileInterval Duration `json:"reconcile_interval"`
@@ -69,10 +78,11 @@ type GeneralSettings struct {
 }
 
 // Settings is what stays global once every integration belongs to a member:
-// the catalogue key and the install-wide knobs.
+// the catalogue key, the household bot and the install-wide knobs.
 type Settings struct {
-	TMDB    TMDBSettings    `json:"tmdb"`
-	General GeneralSettings `json:"general"`
+	TMDB     TMDBSettings     `json:"tmdb"`
+	Telegram TelegramSettings `json:"telegram"`
+	General  GeneralSettings  `json:"general"`
 }
 
 // Configured reports whether TMDB can be searched.
@@ -88,7 +98,10 @@ func defaults() Settings {
 // secretFields maps the dotted path of every secret to a pointer into s, so
 // masking, restoring and env overlays all work from one list.
 func (s *Settings) secretFields() map[string]*string {
-	return map[string]*string{"tmdb.api_key": &s.TMDB.APIKey}
+	return map[string]*string{
+		"tmdb.api_key":       &s.TMDB.APIKey,
+		"telegram.bot_token": &s.Telegram.BotToken,
+	}
 }
 
 const maskRunes = "••••"
@@ -215,12 +228,14 @@ func overlayEnv(s *Settings) map[string]bool {
 	locked := map[string]bool{}
 
 	strs := map[string]*string{
-		"SNAGARR_TMDB_API_KEY": &s.TMDB.APIKey,
-		"SNAGARR_PUBLIC_URL":   &s.General.PublicURL,
+		"SNAGARR_TMDB_API_KEY":       &s.TMDB.APIKey,
+		"SNAGARR_TELEGRAM_BOT_TOKEN": &s.Telegram.BotToken,
+		"SNAGARR_PUBLIC_URL":         &s.General.PublicURL,
 	}
 	paths := map[string]string{
-		"SNAGARR_TMDB_API_KEY": "tmdb.api_key",
-		"SNAGARR_PUBLIC_URL":   "general.public_url",
+		"SNAGARR_TMDB_API_KEY":       "tmdb.api_key",
+		"SNAGARR_TELEGRAM_BOT_TOKEN": "telegram.bot_token",
+		"SNAGARR_PUBLIC_URL":         "general.public_url",
 	}
 	for name, field := range strs {
 		if v := os.Getenv(name); v != "" {
