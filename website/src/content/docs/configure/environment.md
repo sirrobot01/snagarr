@@ -48,6 +48,7 @@ The container image sets `SNAGARR_DATA_DIR=/data`.
 | Variable | Overrides | Type |
 |----------|-----------|------|
 | `SNAGARR_TMDB_API_KEY` | `tmdb.api_key` | string |
+| `SNAGARR_TELEGRAM_BOT_TOKEN` | `telegram.bot_token` | string |
 | `SNAGARR_PUBLIC_URL` | `general.public_url` | string |
 | `SNAGARR_RECONCILE_INTERVAL` | `general.reconcile_interval` | Go duration |
 

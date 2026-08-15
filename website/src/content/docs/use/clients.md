@@ -1,6 +1,6 @@
 ---
 title: Capture clients
-description: Capture from the web app, the Snagarr CLI, the published Apple Shortcut, a bookmarklet or curl.
+description: Capture from the web app, the Snagarr CLI, the published Apple Shortcut, the Telegram bot, a bookmarklet or curl.
 ---
 
 Every client is a front-end over one endpoint: `POST /api/v1/capture`. Each one authenticates with its own bearer token. See [First run](/snagarr/start/first-run/#tokens) to issue one.
@@ -11,7 +11,7 @@ Every client is a front-end over one endpoint: `POST /api/v1/capture`. Each one 
 | Apple Shortcut | Install Snagarr's published link | iOS, iPadOS, macOS, watchOS |
 | Bookmarklet | Works from any origin | Desktop browser |
 | `curl` and scripts | Works | Anywhere |
-| Telegram bot | Dropped | — |
+| Telegram bot | Works. The household chat client | Any device with Telegram |
 | Command line | Included in the `snagarr` binary | Linux, macOS, Windows, FreeBSD |
 
 ## The capture request
@@ -28,7 +28,7 @@ Content-Type: application/json
 | `url` | string | A link. Used when `query` is empty |
 | `tmdb_id` | number | An exact TMDB ID. Needs `media_type` |
 | `media_type` | string | `movie` or `tv`. Only with `tmdb_id` |
-| `source` | string | `web`, `shortcut`, `bookmarklet`, `api` or `cli`. Defaults to `api` |
+| `source` | string | `web`, `shortcut`, `telegram`, `bookmarklet`, `api` or `cli`. Defaults to `api` |
 | `note` | string | Free text kept with the item |
 | `source_url` | string | The page the capture came from |
 
@@ -209,6 +209,39 @@ An iCloud link is public, so it cannot carry a token. Import questions collect t
 :::caution[Publish a reachable address]
 Whatever you put in the URL **Text** action is the default every importer sees. A shortcut published with `localhost` is useless to anybody else. Publish the address the household actually reaches.
 :::
+
+## Telegram bot
+
+The bot is the household chat client, and the capture path on Android: type or share a title into a Telegram chat and it lands on the list with your name on it. The bot long-polls telegram.org, so it needs no public URL, no open port and no webhook. It works behind CGNAT.
+
+### Set up the bot
+
+1. Message [@BotFather](https://t.me/BotFather) on Telegram.
+2. Send `/newbot`. Give the bot a name and a username.
+3. Copy the token BotFather answers with.
+4. Open **Settings** as an admin. Paste the token into the **Telegram bot** card.
+5. Select **Test connection**. The card must answer with the bot's username.
+
+`SNAGARR_TELEGRAM_BOT_TOKEN` pins the token and locks the card.
+
+### Link the members
+
+The bot answers only Telegram accounts on the household table. There is no separate allow-list.
+
+1. The member messages the bot once. The bot replies with their Telegram ID.
+2. An admin puts that ID on the member's row in **Settings → Household**.
+3. The member messages the bot again. From now on it snags.
+
+### Use it
+
+Send the bot a title or a link.
+
+- The bot snags it with the member's name attached and replies with the poster and the state badge.
+- A new title offers **Send to Radarr** or **Send to Sonarr**. The send uses the member's own service; for admins, another admin's is the fallback.
+- An uncertain match offers up to three candidates. One tap resolves it. **None of these** parks it in Needs Review on the web.
+- A title already on the list answers "already on the household list" instead of duplicating it.
+
+A member may act on their own snags. Only an admin may act on another member's.
 
 ## Bookmarklet
 

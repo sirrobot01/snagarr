@@ -28,6 +28,14 @@ Release builds carry a shared TMDB key, so this section works out of the box. Se
 
 Use a TMDB API key (v3).
 
+## Telegram
+
+The household bot. Paste a token from [@BotFather](https://t.me/BotFather); who may message it is the Telegram IDs on the household table. See [Capture clients](/snagarr/use/clients/#telegram-bot).
+
+| Field | Type | Default | Variable |
+|-------|------|---------|----------|
+| `telegram.bot_token` | string | *(empty — the bot is off)* | `SNAGARR_TELEGRAM_BOT_TOKEN` |
+
 ## General
 
 | Field | Type | Default | Variable |
