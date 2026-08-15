@@ -13,10 +13,13 @@ import (
 )
 
 const (
-	tmdbBaseURL = "https://api.themoviedb.org/3"
-	searchTTL   = 24 * time.Hour
-	detailsTTL  = 7 * 24 * time.Hour
+	searchTTL  = 24 * time.Hour
+	detailsTTL = 7 * 24 * time.Hour
 )
+
+// TMDBBaseURL is a variable so tests outside this package can stand in a fake
+// server, the same way UserAgent is open to the build.
+var TMDBBaseURL = "https://api.themoviedb.org/3"
 
 // ErrNotFound is returned when TMDB has no match for a lookup.
 var ErrNotFound = errors.New("tmdb: not found")
@@ -64,7 +67,7 @@ type TMDBExternalIDs struct {
 
 // NewTMDB returns a TMDB client. cache may be nil.
 func NewTMDB(apiKey string, cache Cache) *TMDBClient {
-	return &TMDBClient{rest: client{BaseURL: tmdbBaseURL}, apiKey: apiKey, cache: cache}
+	return &TMDBClient{rest: client{BaseURL: TMDBBaseURL}, apiKey: apiKey, cache: cache}
 }
 
 // SearchMulti searches movies and TV in one call. Person results are dropped.
