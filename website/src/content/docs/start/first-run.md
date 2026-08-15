@@ -30,7 +30,7 @@ Open `/setup` for the four-step wizard. Every step can be skipped and done later
 
 | Step | What you do | Required |
 |------|-------------|----------|
-| 1 | Paste a TMDB API key (v3) from [themoviedb.org](https://www.themoviedb.org/settings/api) | Yes. Without it, captures save but never resolve. |
+| 1 | Optionally paste a TMDB API key (v3) from [themoviedb.org](https://www.themoviedb.org/settings/api) | No on a release build, which carries a shared key. Your own key replaces the shared one. A source build without an embedded key needs one; without any key, captures save but never resolve. |
 | 2 | Add a media server: Plex, Emby or Jellyfin | No. Gives the library badges and the `Snagged` collection. |
 | 3 | Add Radarr and Sonarr | No. Needed to send titles. |
 | 4 | Review the connections and optionally create a client token | No. |

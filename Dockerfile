@@ -16,12 +16,15 @@ COPY --from=web /src/internal/web/dist ./internal/web/dist
 ARG VERSION=dev
 ARG COMMIT=none
 ARG DATE=unknown
+# The shared TMDB key; a build without it works, operators enter their own.
+ARG TMDB_KEY=""
 ENV CGO_ENABLED=0
 RUN go build -trimpath \
       -ldflags "-s -w \
         -X github.com/sirrobot01/snagarr/internal/version.Version=${VERSION} \
         -X github.com/sirrobot01/snagarr/internal/version.Commit=${COMMIT} \
-        -X github.com/sirrobot01/snagarr/internal/version.Date=${DATE}" \
+        -X github.com/sirrobot01/snagarr/internal/version.Date=${DATE} \
+        -X github.com/sirrobot01/snagarr/internal/config.DefaultTMDBKey=${TMDB_KEY}" \
       -o /snagarr ./cmd/snagarr
 
 # Alpine rather than distroless: PUID/PGID needs a shell, a user database and

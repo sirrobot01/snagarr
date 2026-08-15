@@ -20,11 +20,11 @@ Radarr, Sonarr, Overseerr, Plex, Emby, Jellyfin and ntfy are gone from this endp
 
 ## TMDB
 
-TMDB is required. Without it, Snagarr saves captures but never resolves them.
+Release builds carry a shared TMDB key, so this section works out of the box. Set `tmdb.api_key` to use your own key instead — it always wins over the shared one. A source build without an embedded key needs one; without any key, Snagarr saves captures but never resolves them.
 
 | Field | Type | Default | Variable |
 |-------|------|---------|----------|
-| `tmdb.api_key` | string | *(empty)* | `SNAGARR_TMDB_API_KEY` |
+| `tmdb.api_key` | string | *(empty — the shared key answers)* | `SNAGARR_TMDB_API_KEY` |
 
 Use a TMDB API key (v3).
 

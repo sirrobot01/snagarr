@@ -136,6 +136,9 @@ export interface TmdbSettings {
   api_key: string;
   configured: boolean;
   locked?: boolean;
+  /** True when this build carries Snagarr's shared key, making the field an
+      optional override rather than a requirement. */
+  builtin_key?: boolean;
 }
 
 export interface GeneralSettings {

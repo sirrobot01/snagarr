@@ -21,6 +21,8 @@ builds:
       - -X github.com/sirrobot01/snagarr/internal/version.Version={{ .Version }}
       - -X github.com/sirrobot01/snagarr/internal/version.Commit={{ .ShortCommit }}
       - -X github.com/sirrobot01/snagarr/internal/version.Date={{ .Date }}
+      # The shared TMDB key; releases without the secret still build and run.
+      - -X github.com/sirrobot01/snagarr/internal/config.DefaultTMDBKey={{ envOrDefault "SNAGARR_EMBEDDED_TMDB_KEY" "" }}
     mod_timestamp: "{{ .CommitTimestamp }}"
     goos:
       - linux

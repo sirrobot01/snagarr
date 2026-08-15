@@ -32,10 +32,29 @@ func (d *Duration) UnmarshalJSON(b []byte) error {
 	return nil
 }
 
+// DefaultTMDBKey is the shared catalogue key release builds carry, the way
+// Overseerr embeds one: TMDB's API is free for non-commercial use and limits
+// by IP rather than by key, so one key serves every install. It is empty in a
+// plain source build and injected at release time with
+//
+//	-ldflags "-X github.com/sirrobot01/snagarr/internal/config.DefaultTMDBKey=…"
+//
+// A key the operator enters, or SNAGARR_TMDB_API_KEY, always wins over it.
+var DefaultTMDBKey string
+
 // TMDBSettings is the one catalogue key for the whole install. Every other
 // integration belongs to a member and lives in the services table.
 type TMDBSettings struct {
 	APIKey string `json:"api_key"`
+}
+
+// Key resolves what to call TMDB with: the operator's own key when they set
+// one, otherwise the embedded default.
+func (s TMDBSettings) Key() string {
+	if s.APIKey != "" {
+		return s.APIKey
+	}
+	return DefaultTMDBKey
 }
 
 // GeneralSettings are the install-wide knobs.
@@ -57,7 +76,7 @@ type Settings struct {
 }
 
 // Configured reports whether TMDB can be searched.
-func (s TMDBSettings) Configured() bool { return s.APIKey != "" }
+func (s TMDBSettings) Configured() bool { return s.Key() != "" }
 
 func defaults() Settings {
 	return Settings{General: GeneralSettings{

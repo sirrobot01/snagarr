@@ -57,3 +57,4 @@ jobs:
           args: release --clean
         env:
           GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+          SNAGARR_EMBEDDED_TMDB_KEY: ${{ secrets.SNAGARR_EMBEDDED_TMDB_KEY }}

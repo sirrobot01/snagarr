@@ -259,5 +259,5 @@ func TMDB(s config.Settings, cache Cache) *TMDBClient {
 	if !s.TMDB.Configured() {
 		return nil
 	}
-	return NewTMDB(s.TMDB.APIKey, cache)
+	return NewTMDB(s.TMDB.Key(), cache)
 }

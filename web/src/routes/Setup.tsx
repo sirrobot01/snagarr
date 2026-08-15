@@ -36,6 +36,10 @@ export default function Setup() {
 
   const page = STEPS[step];
   const last = step === STEPS.length - 1;
+  const copy =
+    step === 0 && settings.data?.tmdb.builtin_key
+      ? 'Snagarr ships with a shared TMDB key, so this step is optional. Add your own key to use it instead.'
+      : page.copy;
 
   /* Only step 1 writes settings. The service steps save themselves card by
      card, because a service has to exist before it can be tested. */
@@ -74,7 +78,7 @@ export default function Setup() {
     <SetupCard
       step={step}
       title={page.title}
-      copy={page.copy}
+      copy={copy}
       footer={
         <>
           <button

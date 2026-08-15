@@ -51,6 +51,12 @@ func (s *Server) settingsBody(settings config.Settings) (map[string]any, error) 
 		locked[section] = true
 	}
 
+	// The TMDB card's copy depends on whether this build carries a shared key:
+	// with one, the field is an optional override rather than a requirement.
+	if section, ok := sections["tmdb"]; ok {
+		section["builtin_key"] = config.DefaultTMDBKey != ""
+	}
+
 	body := make(map[string]any, len(sections))
 	for name, section := range sections {
 		section["configured"] = configured[name]

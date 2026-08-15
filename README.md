@@ -63,7 +63,7 @@ Binaries for linux, darwin, windows and freebsd are on the
 
 | Service | Needed for |
 |---|---|
-| TMDB API key | Required. Search and resolution. |
+| TMDB API key | Built in — release builds ship a shared key. Add your own to override. |
 | Plex / Emby / Jellyfin | Library badges, Snagged collection. Plex links by sign-in or token. |
 | Radarr / Sonarr | One-tap send. |
 | Overseerr | Request instead of direct push. |

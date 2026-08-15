@@ -11,11 +11,16 @@ vars:
     sh: git rev-parse --short HEAD 2>/dev/null || echo none
   DATE:
     sh: date -u +%Y-%m-%dT%H:%M:%SZ
+  # The shared TMDB key ships only in builds that have it in the environment
+  # (or .env). A build without it still works; operators enter their own key.
+  TMDB_KEY:
+    sh: echo "${SNAGARR_EMBEDDED_TMDB_KEY:-}"
   LDFLAGS: >-
     -s -w
     -X {{.VERSION_PKG}}.Version={{.VERSION}}
     -X {{.VERSION_PKG}}.Commit={{.COMMIT}}
     -X {{.VERSION_PKG}}.Date={{.DATE}}
+    -X github.com/sirrobot01/snagarr/internal/config.DefaultTMDBKey={{.TMDB_KEY}}
 
 tasks:
   default:

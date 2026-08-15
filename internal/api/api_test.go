@@ -1095,3 +1095,32 @@ func TestImportWebhookFiltersEventTypes(t *testing.T) {
 		t.Errorf("after Download status = %s, want available", got.Status)
 	}
 }
+
+// A build carrying the shared TMDB key needs no key from the operator: setup
+// is not required, the card reads as configured, and the key itself never
+// travels to a client.
+func TestSettingsReportBuiltinTMDBKey(t *testing.T) {
+	old := config.DefaultTMDBKey
+	t.Cleanup(func() { config.DefaultTMDBKey = old })
+	config.DefaultTMDBKey = "builtin-secret"
+
+	h := newHarness(t)
+
+	resp := h.do(t, http.MethodGet, "/api/v1/settings", h.adminToken, nil)
+	body := decodeBody[map[string]map[string]any](t, resp)
+	if body["tmdb"]["builtin_key"] != true {
+		t.Errorf("tmdb.builtin_key = %v, want true", body["tmdb"]["builtin_key"])
+	}
+	if body["tmdb"]["configured"] != true {
+		t.Errorf("tmdb.configured = %v, want true", body["tmdb"]["configured"])
+	}
+	if body["tmdb"]["api_key"] != "" {
+		t.Errorf("tmdb.api_key = %v; the built-in key must never reach a client", body["tmdb"]["api_key"])
+	}
+
+	resp = h.do(t, http.MethodGet, "/api/v1/auth/status", "", nil)
+	status := decodeBody[map[string]bool](t, resp)
+	if status["setup_required"] {
+		t.Error("setup_required = true; the built-in key should cover setup")
+	}
+}

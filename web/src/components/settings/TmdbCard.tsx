@@ -40,13 +40,19 @@ export function TmdbCard({ settings, draft }: CardProps) {
 
       <TextField
         id="tmdb-key"
-        label="API key (v3)"
+        label={current.builtin_key ? 'API key (v3) — optional' : 'API key (v3)'}
         value={current.api_key}
         locked={current.locked}
         type="password"
         autoComplete="off"
-        placeholder="Paste your TMDB API key"
-        description="Use a TMDB API key (v3), available free from your TMDB account settings."
+        placeholder={
+          current.builtin_key ? 'Using Snagarr’s built-in key' : 'Paste your TMDB API key'
+        }
+        description={
+          current.builtin_key
+            ? 'Snagarr ships with a shared TMDB key. Paste your own key (v3) to use it instead.'
+            : 'Use a TMDB API key (v3), available free from your TMDB account settings.'
+        }
         onChange={(value) => draft.set('tmdb', { api_key: value })}
       />
 
