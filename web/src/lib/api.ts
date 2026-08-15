@@ -137,15 +137,19 @@ export const api = {
 
   revokeToken: (id: number) => request<void>(`/tokens/${id}`, { method: 'DELETE' }),
 
-  /** Admin only — the global settings are now just TMDB and General. */
+  /** Admin only — the global settings are TMDB, the Telegram bot and General. */
   settings: () => request<Settings>('/settings'),
 
   saveSettings: (patch: SettingsPatch) =>
     request<Settings>('/settings', { method: 'PUT', ...json(patch) }),
 
-  /** The only global service left with a test of its own. */
+  /* The two global services test through the settings endpoint; everything
+     else is a service record with a test of its own. */
   testTmdb: () =>
     request<TestResult>('/settings/test', { method: 'POST', ...json({ service: 'tmdb' }) }),
+
+  testTelegram: () =>
+    request<TestResult>('/settings/test', { method: 'POST', ...json({ service: 'telegram' }) }),
 
   /* ── Services ───────────────────────────────────────────────────────────── */
 

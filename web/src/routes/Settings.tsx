@@ -5,6 +5,7 @@ import { GeneralCard } from '../components/settings/GeneralCard';
 import { HouseholdSection } from '../components/settings/HouseholdSection';
 import { MyServices } from '../components/settings/MyServices';
 import { ErrorState, Loading } from '../components/settings/states';
+import { TelegramCard } from '../components/settings/TelegramCard';
 import { TmdbCard } from '../components/settings/TmdbCard';
 import { isAdmin, useMe, useSaveSettings, useSettings } from '../lib/queries';
 import { pushToast } from '../lib/toast';
@@ -109,6 +110,7 @@ function GlobalCards({
       <div className="sg-cards">
         <GeneralCard settings={settings} draft={draft} />
         <TmdbCard settings={settings} draft={draft} />
+        <TelegramCard settings={settings} draft={draft} />
       </div>
 
       {draft.dirty && (

@@ -109,6 +109,16 @@ export function useTmdbTest(): ServiceTest {
   };
 }
 
+export function useTelegramTest(): ServiceTest {
+  const test = useMutation({ mutationFn: api.testTelegram });
+  return {
+    result: toTest(test.status, test.data, test.error),
+    pending: test.isPending,
+    run: () => test.mutate(),
+    probed: null,
+  };
+}
+
 /* The lookup calls the service itself, so it runs on credentials that have
    answered — the stored ones, or the ones a test just accepted — rather than on
    every keystroke. A null config means there is nothing to ask yet. */

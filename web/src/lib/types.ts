@@ -151,8 +151,15 @@ export interface GeneralSettings {
   locked?: boolean;
 }
 
+export interface TelegramSettings {
+  bot_token: string;
+  configured: boolean;
+  locked?: boolean;
+}
+
 export interface Settings {
   tmdb: TmdbSettings;
+  telegram: TelegramSettings;
   general: GeneralSettings;
 }
 

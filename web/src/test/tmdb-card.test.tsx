@@ -10,6 +10,7 @@ import { makeClient, mockFetch, wrapper } from './utils';
 function settingsWith(builtin: boolean): Settings {
   return {
     tmdb: { api_key: '', configured: builtin, builtin_key: builtin },
+    telegram: { bot_token: '', configured: false },
     general: {
       reconcile_interval: '15m',
       public_url: '',
