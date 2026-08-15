@@ -2,7 +2,9 @@ root = "."
 tmp_dir = "bin"
 
 [build]
-  cmd = "go build -o ./bin/snagarr ./cmd/snagarr"
+  # task dev exports .env, so a dev build carries the shared TMDB key the way a
+  # release does. Unset, the expansion is empty and the build works without it.
+  cmd = "go build -ldflags \"-X github.com/sirrobot01/snagarr/internal/config.DefaultTMDBKey=${SNAGARR_EMBEDDED_TMDB_KEY}\" -o ./bin/snagarr ./cmd/snagarr"
   bin = "./bin/snagarr"
   args_bin = ["serve"]
   include_ext = ["go", "sql"]

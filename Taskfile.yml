@@ -11,10 +11,10 @@ vars:
     sh: git rev-parse --short HEAD 2>/dev/null || echo none
   DATE:
     sh: date -u +%Y-%m-%dT%H:%M:%SZ
-  # The shared TMDB key ships only in builds that have it in the environment
-  # (or .env). A build without it still works; operators enter their own key.
-  TMDB_KEY:
-    sh: echo "${SNAGARR_EMBEDDED_TMDB_KEY:-}"
+  # The shared TMDB key ships only in builds that have it in .env or exported
+  # in the environment. A build without it still works; operators enter their
+  # own key. Dynamic (sh) vars never see dotenv values, hence the template.
+  TMDB_KEY: '{{.SNAGARR_EMBEDDED_TMDB_KEY | default (env "SNAGARR_EMBEDDED_TMDB_KEY") | default ""}}'
   LDFLAGS: >-
     -s -w
     -X {{.VERSION_PKG}}.Version={{.VERSION}}
@@ -61,6 +61,8 @@ tasks:
       - go.mod
       - go.sum
       - internal/web/dist/**/*
+      # The embedded TMDB key comes from here, so changing it must rebuild.
+      - .env
     generates:
       - bin/{{.BINARY}}
     cmds:
