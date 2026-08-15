@@ -479,30 +479,3 @@ func (s *Server) household(ctx context.Context) (integration.Household, error) {
 	}
 	return house, nil
 }
-
-// serviceOwners is the order a personal action searches in: the caller's own
-// service first, then the item capturer's, then any admin's. An action must not
-// fail for want of a service somebody in the household already has.
-func (s *Server) serviceOwners(ctx context.Context, caller *store.User, capturer int64) []int64 {
-	// A member may only spend their own services. Falling back to an admin's
-	// Radarr would let anyone with a token push to it, which is the permission
-	// the admin-only route used to protect.
-	if caller.Role != store.RoleAdmin {
-		return []int64{caller.ID}
-	}
-	owners := []int64{caller.ID}
-	if capturer != 0 && capturer != caller.ID {
-		owners = append(owners, capturer)
-	}
-	users, err := s.store.Users(ctx)
-	if err != nil {
-		s.log.Warn("could not list household members", "error", err)
-		return owners
-	}
-	for _, u := range users {
-		if u.Role == store.RoleAdmin && u.ID != caller.ID {
-			owners = append(owners, u.ID)
-		}
-	}
-	return owners
-}
