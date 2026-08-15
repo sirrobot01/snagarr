@@ -109,8 +109,11 @@ function GlobalCards({
       />
       <div className="sg-cards">
         <GeneralCard settings={settings} draft={draft} />
-        <TmdbCard settings={settings} draft={draft} />
-        <TelegramCard settings={settings} draft={draft} />
+        {/* One column: three cards side by side squeeze their inputs. */}
+        <div className="sg-card-stack">
+          <TmdbCard settings={settings} draft={draft} />
+          <TelegramCard settings={settings} draft={draft} />
+        </div>
       </div>
 
       {draft.dirty && (

@@ -412,6 +412,10 @@ h4 { font-size: 20px; }
 
 .sg-cards { display: flex; grid-template-columns: none; flex-wrap: wrap; gap: 2px; padding: 0; border-block: 2px solid var(--color-divider); background: var(--color-divider); }
 .sg-cards > * { min-width: 0; flex: 1 1 280px; }
+/* Two thin cards can share one column: the stack is a single flex item, so its
+   cards sit under each other instead of squeezing the row three ways. */
+.sg-card-stack { display: flex; flex-direction: column; gap: 2px; }
+.sg-card-stack > .sg-card { flex: 1; }
 .sg-card { --sg-card-row: 23px; gap: 12px; padding: 16px; border: 0; border-radius: 0; background: var(--color-bg); box-shadow: none; transition: none; }
 .sg-card:hover { border-color: transparent; box-shadow: none; transform: none; }
 .sg-card[data-collapsed='1'] { gap: 0; }
