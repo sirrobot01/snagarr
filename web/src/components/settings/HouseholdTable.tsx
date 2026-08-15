@@ -1,5 +1,5 @@
 import { useMutation, useQueryClient } from '@tanstack/react-query';
-import { KeyRound, Server, Trash2 } from 'lucide-react';
+import { KeyRound, Send, Server, Trash2 } from 'lucide-react';
 import { useState } from 'react';
 import { api } from '../../lib/api';
 import { keys } from '../../lib/queries';
@@ -13,9 +13,10 @@ interface Props {
   meId: number;
   onInspect: (user: HouseholdUser) => void;
   onTokens: (user: HouseholdUser) => void;
+  onLink: (user: HouseholdUser) => void;
 }
 
-export function HouseholdTable({ users, meId, onInspect, onTokens }: Props) {
+export function HouseholdTable({ users, meId, onInspect, onTokens, onLink }: Props) {
   const client = useQueryClient();
   const [removing, setRemoving] = useState<HouseholdUser | null>(null);
 
@@ -77,6 +78,14 @@ export function HouseholdTable({ users, meId, onInspect, onTokens }: Props) {
                   >
                     <KeyRound aria-hidden="true" size={15} />
                     Tokens
+                  </button>
+                  <button
+                    type="button"
+                    className="btn btn-ghost min-h-[44px]"
+                    onClick={() => onLink(user)}
+                  >
+                    <Send aria-hidden="true" size={15} />
+                    Telegram
                   </button>
                   {user.id !== meId && (
                     <button

@@ -128,6 +128,11 @@ export const api = {
   }) =>
     request<HouseholdUser>('/users', { method: 'POST', ...json(body) }),
 
+  updateUser: (
+    id: number,
+    patch: { username?: string; password?: string; role?: string; telegram_user_id?: number },
+  ) => request<HouseholdUser>(`/users/${id}`, { method: 'PATCH', ...json(patch) }),
+
   deleteUser: (id: number) => request<void>(`/users/${id}`, { method: 'DELETE' }),
 
   tokens: (userId: number) => request<{ tokens: Token[] }>(`/users/${userId}/tokens`),

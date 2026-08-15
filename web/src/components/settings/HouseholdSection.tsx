@@ -9,6 +9,7 @@ import { BookmarkletDialog } from './BookmarkletDialog';
 import { HouseholdTable } from './HouseholdTable';
 import { MemberDialog } from './MemberDialog';
 import { MemberServicesDialog } from './MemberServicesDialog';
+import { TelegramLinkDialog } from './TelegramLinkDialog';
 import { TokensDialog } from './TokensDialog';
 import { ErrorState, Loading, errorText } from './states';
 
@@ -19,6 +20,7 @@ export function HouseholdSection({ publicUrl, meId }: { publicUrl: string; meId:
   const [bookmarklet, setBookmarklet] = useState(false);
   const [inspecting, setInspecting] = useState<HouseholdUser | null>(null);
   const [tokensFor, setTokensFor] = useState<HouseholdUser | null>(null);
+  const [linking, setLinking] = useState<HouseholdUser | null>(null);
 
   const sync = useMutation({
     mutationFn: api.sync,
@@ -48,6 +50,7 @@ export function HouseholdSection({ publicUrl, meId }: { publicUrl: string; meId:
           meId={meId}
           onInspect={setInspecting}
           onTokens={setTokensFor}
+          onLink={setLinking}
         />
       ) : (
         <Loading label="Loading household…" />
@@ -82,6 +85,7 @@ export function HouseholdSection({ publicUrl, meId }: { publicUrl: string; meId:
       </div>
 
       {adding && <MemberDialog onClose={() => setAdding(false)} />}
+      {linking && <TelegramLinkDialog user={linking} onClose={() => setLinking(null)} />}
       {bookmarklet && (
         <BookmarkletDialog
           publicUrl={publicUrl}

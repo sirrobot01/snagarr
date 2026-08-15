@@ -229,7 +229,7 @@ The bot is the household chat client, and the capture path on Android: type or s
 The bot answers only Telegram accounts on the household table. There is no separate allow-list.
 
 1. The member messages the bot once. The bot replies with their Telegram ID.
-2. An admin puts that ID on the member's row in **Settings → Household**.
+2. An admin selects **Telegram** on the member's row in **Settings → Household** — their own row included — and enters the ID.
 3. The member messages the bot again. From now on it snags.
 
 ### Use it
