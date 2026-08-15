@@ -128,17 +128,6 @@ task test      # Go and web tests
 task build     # one binary with the UI inside, into bin/
 ```
 
-| Path | |
-|---|---|
-| `cmd/snagarr` | Entry point |
-| `internal/store` | SQLite: schema, items, indexes, services |
-| `internal/api` | HTTP surface |
-| `internal/reconcile` | Index sync and state derivation |
-| `internal/{tmdb,arr,library,overseerr,notify}` | External clients, each behind a narrow interface |
-| `web` | React client, built into `internal/web/dist`, embedded at compile time |
-| `website` | Astro docs site |
-| `assets` | The mark, the app icon and the rules for using them |
-
 ## Credits
 
 This product uses the TMDB API but is not endorsed or certified by TMDB.
