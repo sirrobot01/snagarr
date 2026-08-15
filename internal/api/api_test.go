@@ -407,7 +407,8 @@ func TestSettingsMaskSecrets(t *testing.T) {
 	h := newHarness(t)
 
 	resp := h.do(t, http.MethodPut, "/api/v1/settings", h.adminToken, map[string]any{
-		"tmdb": map[string]any{"api_key": "super-secret-4e2a"},
+		"tmdb":     map[string]any{"api_key": "super-secret-4e2a"},
+		"telegram": map[string]any{"bot_token": "123456:bot-secret-9f1c"},
 	})
 	if resp.StatusCode != http.StatusOK {
 		t.Fatalf("PUT /settings = %d, want 200", resp.StatusCode)
@@ -427,8 +428,16 @@ func TestSettingsMaskSecrets(t *testing.T) {
 	if _, ok := got["tmdb"]["locked"]; !ok {
 		t.Error("sections carry no locked flag; the settings UI needs it")
 	}
-	// Every integration except TMDB is a service now.
-	for _, gone := range []string{"library", "radarr", "sonarr", "overseerr", "ntfy", "telegram"} {
+	maskedToken, _ := got["telegram"]["bot_token"].(string)
+	if maskedToken == "123456:bot-secret-9f1c" || !config.IsMasked(maskedToken) {
+		t.Errorf("bot_token = %q, want it masked", maskedToken)
+	}
+	if configured, _ := got["telegram"]["configured"].(bool); !configured {
+		t.Error("telegram.configured = false after setting a token")
+	}
+	// Every per-member integration is a service now; only the global
+	// catalogue key, the household bot and the knobs stay settings.
+	for _, gone := range []string{"library", "radarr", "sonarr", "overseerr", "ntfy"} {
 		if _, ok := got[gone]; ok {
 			t.Errorf("settings still carry the %q section", gone)
 		}
@@ -797,7 +806,7 @@ func TestAutoSendUsesTheCapturersArr(t *testing.T) {
 	}
 
 	it := seedSnag(t, h, h.member.ID)
-	h.api.autoSend(context.Background(), it.ID)
+	h.api.sender.AutoSend(context.Background(), it.ID)
 
 	if added != 1 {
 		t.Errorf("radarr adds = %d, want 1", added)
@@ -829,7 +838,7 @@ func TestAutoSendOffLeavesTheItemAlone(t *testing.T) {
 	}
 
 	it := seedSnag(t, h, h.member.ID)
-	h.api.autoSend(context.Background(), it.ID)
+	h.api.sender.AutoSend(context.Background(), it.ID)
 
 	if added != 0 {
 		t.Errorf("radarr adds = %d, want none while automatic sending is off", added)
@@ -849,7 +858,7 @@ func TestAutoSendNeverSpendsAnotherMembersService(t *testing.T) {
 	})
 
 	it := seedSnag(t, h, h.member.ID)
-	h.api.autoSend(context.Background(), it.ID)
+	h.api.sender.AutoSend(context.Background(), it.ID)
 
 	if added != 0 {
 		t.Errorf("radarr adds = %d, want none", added)

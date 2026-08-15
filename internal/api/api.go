@@ -20,6 +20,7 @@ type Server struct {
 	settings   *config.Manager
 	resolver   *engine.Resolver
 	reconciler *engine.Reconciler
+	sender     *engine.Sender
 	web        http.Handler
 	log        *slog.Logger
 
@@ -30,7 +31,7 @@ type Server struct {
 func New(st *store.Store, settings *config.Manager, res *engine.Resolver,
 	reconciler *engine.Reconciler, web http.Handler, log *slog.Logger) *Server {
 	return &Server{store: st, settings: settings, resolver: res, reconciler: reconciler,
-		web: web, log: log}
+		sender: engine.NewSender(st, settings, reconciler, log), web: web, log: log}
 }
 
 func (s *Server) Handler() http.Handler {

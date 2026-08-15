@@ -41,7 +41,8 @@ func (s *Server) settingsBody(settings config.Settings) (map[string]any, error) 
 	}
 
 	configured := map[string]bool{
-		"tmdb": settings.TMDB.Configured(),
+		"tmdb":     settings.TMDB.Configured(),
+		"telegram": settings.Telegram.Configured(),
 		// General always works: every field in it has a usable default.
 		"general": true,
 	}
