@@ -25,20 +25,17 @@ export function StepTmdb({ settings, draft }: CardProps) {
 
   return (
     <div className="flex flex-col gap-4">
+      {/* This step only renders in builds without the shared key, so the key
+          reads as required here; the optional-override copy lives on the
+          Settings card. */}
       <TextField
         id="setup-tmdb"
-        label={current.builtin_key ? 'API key (v3) — optional' : 'API key (v3)'}
+        label="API key (v3)"
         value={current.api_key}
         locked={current.locked}
         type="password"
-        placeholder={
-          current.builtin_key ? 'Using Snagarr’s built-in key' : 'Paste your TMDB API key'
-        }
-        description={
-          current.builtin_key
-            ? 'Snagarr ships with a shared TMDB key, so you can continue without one. Paste your own key to use it instead.'
-            : 'The key is stored securely and used only to look up title metadata.'
-        }
+        placeholder="Paste your TMDB API key"
+        description="The key is stored securely and used only to look up title metadata."
         onChange={(value) => draft.set('tmdb', { api_key: value })}
       />
       <TestRow

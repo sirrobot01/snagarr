@@ -26,20 +26,22 @@ account menu before leaving a shared device.
 
 ## Setup wizard
 
-Open `/setup` for the four-step wizard. Every step can be skipped and done later in Settings.
+Open `/setup` for the wizard. Every step can be skipped and done later in Settings.
+
+A release build carries a shared TMDB key, so its wizard has three steps and starts at the media server. To use your own key instead, paste it in **Settings → TMDB**. A source build without an embedded key adds a TMDB step at the front.
 
 | Step | What you do | Required |
 |------|-------------|----------|
-| 1 | Optionally paste a TMDB API key (v3) from [themoviedb.org](https://www.themoviedb.org/settings/api) | No on a release build, which carries a shared key. Your own key replaces the shared one. A source build without an embedded key needs one; without any key, captures save but never resolve. |
-| 2 | Add a media server: Plex, Emby or Jellyfin | No. Gives the library badges and the `Snagged` collection. |
-| 3 | Add Radarr and Sonarr | No. Needed to send titles. |
-| 4 | Review the connections and optionally create a client token | No. |
+| TMDB *(source builds only)* | Paste a TMDB API key (v3) from [themoviedb.org](https://www.themoviedb.org/settings/api) | Yes, for a source build without an embedded key. Without any key, captures save but never resolve. |
+| Media server | Add a media server: Plex, Emby or Jellyfin | No. Gives the library badges and the `Snagged` collection. |
+| Radarr and Sonarr | Add Radarr and Sonarr | No. Needed to send titles. |
+| Review | Review the connections and optionally create a client token | No. |
 
-Step 1 writes a setting. Steps 2 and 3 create [services](/snagarr/configure/services/) you own. A service must exist before it can be tested, so each card saves itself.
+The TMDB step writes a setting. The two service steps create [services](/snagarr/configure/services/) you own. A service must exist before it can be tested, so each card saves itself.
 
 Each card has a **Test connection** button. It shows the upstream message unchanged, for example `OK · 611 items` or `401 — check token`.
 
-Step 4 lists what the household as a whole can reach. It reads `GET /api/v1/status`, so a service another member connected also counts.
+The review step lists what the household as a whole can reach. It reads `GET /api/v1/status`, so a service another member connected also counts.
 
 ntfy is not a wizard step. Add it in Settings. See [Notifications](/snagarr/configure/notifications/).
 

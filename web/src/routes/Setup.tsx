@@ -10,22 +10,26 @@ import { useSaveSettings, useSettings } from '../lib/queries';
 
 const STEPS = [
   {
+    key: 'tmdb',
     title: 'Connect TMDB',
     copy: 'Snagarr needs one key to turn what you type into a real title.',
   },
   {
+    key: 'library',
     title: 'Point at your library',
     copy: 'Snagarr reads your media server so it always knows what you already own.',
   },
   {
+    key: 'arr',
     title: 'Send to Radarr and Sonarr',
     copy: 'Snagged titles go here when you send them. Both are optional.',
   },
   {
+    key: 'done',
     title: 'You are set up',
     copy: 'Review your connections, then start building the household list.',
   },
-];
+] as const;
 
 export default function Setup() {
   const [, navigate] = useLocation();
@@ -34,12 +38,14 @@ export default function Setup() {
   const draft = useSettingsDraft();
   const save = useSaveSettings();
 
-  const page = STEPS[step];
-  const last = step === STEPS.length - 1;
-  const copy =
-    step === 0 && settings.data?.tmdb.builtin_key
-      ? 'Snagarr ships with a shared TMDB key, so this step is optional. Add your own key to use it instead.'
-      : page.copy;
+  /* A build with the shared key resolves titles out of the box, so its wizard
+     skips straight to the first step that still needs the operator. The
+     override stays discoverable on the Settings page. */
+  const steps = settings.data?.tmdb.builtin_key
+    ? STEPS.filter((s) => s.key !== 'tmdb')
+    : STEPS;
+  const page = steps[step];
+  const last = step === steps.length - 1;
 
   /* Only step 1 writes settings. The service steps save themselves card by
      card, because a service has to exist before it can be tested. */
@@ -61,14 +67,14 @@ export default function Setup() {
 
   if (settings.isError) {
     return (
-      <SetupCard step={step} title={page.title} copy={page.copy}>
+      <SetupCard step={step} total={steps.length} title={page.title} copy={page.copy}>
         <ErrorState error={settings.error} onRetry={() => void settings.refetch()} />
       </SetupCard>
     );
   }
   if (!settings.data) {
     return (
-      <SetupCard step={step} title={page.title} copy={page.copy}>
+      <SetupCard step={step} total={steps.length} title={page.title} copy={page.copy}>
         <Loading label="Loading settings…" />
       </SetupCard>
     );
@@ -77,8 +83,9 @@ export default function Setup() {
   return (
     <SetupCard
       step={step}
+      total={steps.length}
       title={page.title}
-      copy={copy}
+      copy={page.copy}
       footer={
         <>
           <button
@@ -109,20 +116,20 @@ export default function Setup() {
         </>
       }
     >
-      {step === 0 && <StepTmdb settings={settings.data} draft={draft} />}
-      {step === 1 && (
+      {page.key === 'tmdb' && <StepTmdb settings={settings.data} draft={draft} />}
+      {page.key === 'library' && (
         <StepServices
           kinds={['plex', 'emby', 'jellyfin']}
           empty="Add your media server, then sign in or paste a token. Plex can sign you in."
         />
       )}
-      {step === 2 && (
+      {page.key === 'arr' && (
         <StepServices
           kinds={['radarr', 'sonarr']}
           empty="Test each service to load its quality profiles and root folders. Skip this step if you send everything through Overseerr."
         />
       )}
-      {step === 3 && <StepDone />}
+      {page.key === 'done' && <StepDone />}
     </SetupCard>
   );
 }
