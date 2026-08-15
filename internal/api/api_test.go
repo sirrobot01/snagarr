@@ -15,6 +15,7 @@ import (
 
 	"github.com/sirrobot01/snagarr/internal/config"
 	"github.com/sirrobot01/snagarr/internal/engine"
+	"github.com/sirrobot01/snagarr/internal/integration"
 	"github.com/sirrobot01/snagarr/internal/store"
 )
 
@@ -1131,5 +1132,34 @@ func TestSettingsReportBuiltinTMDBKey(t *testing.T) {
 	status := decodeBody[map[string]bool](t, resp)
 	if status["setup_required"] {
 		t.Error("setup_required = true; the built-in key should cover setup")
+	}
+}
+
+// The Telegram token tests through the same endpoint as the TMDB key, since
+// neither has a service record.
+func TestSettingsTestTelegram(t *testing.T) {
+	fake := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, _ *http.Request) {
+		_, _ = w.Write([]byte(`{"ok":true,"result":{"username":"snagarr_bot"}}`))
+	}))
+	t.Cleanup(fake.Close)
+	old := integration.TelegramBaseURL
+	integration.TelegramBaseURL = fake.URL
+	t.Cleanup(func() { integration.TelegramBaseURL = old })
+
+	h := newHarness(t)
+	resp := h.do(t, http.MethodPost, "/api/v1/settings/test", h.adminToken,
+		map[string]string{"service": "telegram"})
+	got := decodeBody[map[string]any](t, resp)
+	if got["ok"] != false || got["message"] != "not configured" {
+		t.Errorf("test without a token = %v, want not configured", got)
+	}
+
+	h.do(t, http.MethodPut, "/api/v1/settings", h.adminToken,
+		map[string]any{"telegram": map[string]any{"bot_token": "123:abc"}})
+	resp = h.do(t, http.MethodPost, "/api/v1/settings/test", h.adminToken,
+		map[string]string{"service": "telegram"})
+	got = decodeBody[map[string]any](t, resp)
+	if got["ok"] != true || got["message"] != "@snagarr_bot" {
+		t.Errorf("test with a token = %v, want the bot name", got)
 	}
 }

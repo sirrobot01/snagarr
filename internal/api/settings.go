@@ -7,6 +7,7 @@ import (
 	"strings"
 
 	"github.com/sirrobot01/snagarr/internal/config"
+	"github.com/sirrobot01/snagarr/internal/integration"
 )
 
 // getSettings returns the live settings with every secret masked. The client
@@ -95,8 +96,9 @@ func (s *Server) putSettings(w http.ResponseWriter, r *http.Request) {
 	writeJSON(w, http.StatusOK, body)
 }
 
-// testSettings pings TMDB. Every other service is tested through
-// /services/{id}/test; TMDB is global, so it has no service record to hang off.
+// testSettings pings TMDB or the Telegram bot. Every other service is tested
+// through /services/{id}/test; these two are global, so they have no service
+// record to hang off.
 func (s *Server) testSettings(w http.ResponseWriter, r *http.Request) {
 	var req struct {
 		Service string `json:"service"`
@@ -104,18 +106,30 @@ func (s *Server) testSettings(w http.ResponseWriter, r *http.Request) {
 	if !decode(w, r, &req) {
 		return
 	}
-	if req.Service != "tmdb" {
+
+	var message string
+	var err error
+	switch req.Service {
+	case "tmdb":
+		catalogue := s.tmdb()
+		if catalogue == nil {
+			writeJSON(w, http.StatusOK, map[string]any{"ok": false, "message": "not configured"})
+			return
+		}
+		message, err = catalogue.Ping(r.Context())
+	case "telegram":
+		token := s.settings.Get().Telegram.BotToken
+		if token == "" {
+			writeJSON(w, http.StatusOK, map[string]any{"ok": false, "message": "not configured"})
+			return
+		}
+		message, err = integration.NewTelegram(token).Me(r.Context())
+	default:
 		writeError(w, http.StatusBadRequest, codeBadRequest,
-			"service must be tmdb; test the rest through /services/{id}/test")
+			"service must be tmdb or telegram; test the rest through /services/{id}/test")
 		return
 	}
 
-	catalogue := s.tmdb()
-	if catalogue == nil {
-		writeJSON(w, http.StatusOK, map[string]any{"ok": false, "message": "not configured"})
-		return
-	}
-	message, err := catalogue.Ping(r.Context())
 	if err != nil {
 		writeJSON(w, http.StatusOK, map[string]any{"ok": false, "message": err.Error()})
 		return

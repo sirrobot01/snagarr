@@ -14,6 +14,7 @@ import (
 	"time"
 
 	"github.com/sirrobot01/snagarr/internal/api"
+	"github.com/sirrobot01/snagarr/internal/bot"
 	"github.com/sirrobot01/snagarr/internal/config"
 	"github.com/sirrobot01/snagarr/internal/engine"
 	"github.com/sirrobot01/snagarr/internal/integration"
@@ -122,8 +123,12 @@ func runServer(cmd *cobra.Command, options serveOptions) error {
 	}
 
 	reconciler := engine.NewReconciler(db, settings, log)
-	server := api.New(db, settings, engine.NewResolver(db, log), reconciler, web.Handler(), log)
+	resolver := engine.NewResolver(db, log)
+	server := api.New(db, settings, resolver, reconciler, web.Handler(), log)
 	go reconciler.Start(ctx)
+	// The bot naps until a token is configured, so it always starts.
+	go bot.New(db, settings, resolver, reconciler,
+		engine.NewSender(db, settings, reconciler, log), log).Run(ctx)
 
 	httpServer := &http.Server{
 		Addr:              cfg.Addr,
